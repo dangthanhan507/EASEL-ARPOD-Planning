@@ -1,6 +1,12 @@
+%{
+    Unfortunately, I have to write this script.
+
+    Here's to my sanity.
+%}
 close all
 clear
 clc
+
 rng(1);
 
 Mission = ARPOD_Mission;
@@ -32,6 +38,8 @@ window_measurements = zeros(3,mhe_horizon);
 window_controls = zeros(3,mhe_horizon);
 window_phases = zeros(mhe_horizon);
 
+chaserEKF = EKF;
+chaserEKF = chaserEKF.initEKF(traj, 1e-20*eye(6));
 
 Mission = Mission.initMission(traj, tstep);
 phase = Mission.phase;
@@ -78,6 +86,7 @@ for i = tstep:tstep:total_time
         %setup measurements
         window_measurements(:,i/tstep) = MPCMHE_thruster.senseModify(meas);
         window_controls(:,i/tstep) = u;
+        chaserEKF = chaserEKF.estimate(u,meas,ekfQ,ekfR,tstep,phase);
         window_states(:,i/tstep) = chaserEKF.state;
         window_phases(i/tstep) = phase;
 
@@ -87,7 +96,6 @@ for i = tstep:tstep:total_time
         end
     else
         error("oof");
-        
     end
         
 end
