@@ -92,5 +92,13 @@ classdef ARPOD_Mission
             obj.sensor = ARPOD_Sensor.sense(obj.traj, sensor_noise, obj.phase);
             obj.inLOS = ARPOD_Mission.isInsideLOS(obj.traj);
         end
+        function obj = nextStepMod(obj, control, system_noise, sensor_noise)
+            obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise, 1);
+            obj.traj = obj.dynamics.currentTraj();
+
+            obj.phase = ARPOD_Mission.calculatePhase(obj.traj);
+            obj.sensor = ARPOD_Sensor.fullSense(obj.traj, sensor_noise);
+            obj.inLOS = ARPOD_Mission.isInsideLOS(obj.traj);
+        end
     end
 end

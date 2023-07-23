@@ -38,12 +38,16 @@ classdef MPCMHE_thruster
 
         % misalignment variables
         % not there yet
+        % TODO: lets get there
         A_x %matrix bias
         b_x %additive bias
     end
     methods (Static)
         %padding solution for MHE
         function modified_sense = senseModify(measurement)
+            %{
+                
+            %}
             [dim,n] = size(measurement);
             modified_sense = measurement;
             if dim == 2
@@ -99,7 +103,7 @@ classdef MPCMHE_thruster
             obj.window_mpcstates = window_mpcstates;
 
             obj.window_measError = 100*ones(3,obj.backwardT);
-            obj.window_controlDisturbances = 100*ones(3,obj.backwardT);
+            obj.window_controlDisturbances = 100*ones(3,obj.backwardT + obj.forwardT);
 
             obj.window_phase = window_phases;
         end
@@ -236,7 +240,7 @@ classdef MPCMHE_thruster
             mpcXs = xs(:,obj.backwardT+1:end);
         end
         function obj = estimate(obj, meas, control, tstep)
-            obj.windowShift(meas,control,tstep);
+            % obj.windowShift(meas,control,tstep);
             obj.optimize();
 
             %estimate

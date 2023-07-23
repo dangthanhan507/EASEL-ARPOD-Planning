@@ -13,7 +13,7 @@ classdef MPCMHE_stats
         timestamps
 
         trackPhase
-        gifctr
+        gifctr % gif ctr
     end
     methods
         function obj = init(obj, window_Realstates, window_MHEstates, windowMPCstates, window_control, tstep, mass)

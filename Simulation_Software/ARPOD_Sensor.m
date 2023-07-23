@@ -74,5 +74,8 @@ classdef ARPOD_Sensor
                 z_t = z_t + noise_model();
             end
         end
+        function z_t = fullSense(state, noise_model)
+            z_t = state + noise_model();
+        end
     end
 end

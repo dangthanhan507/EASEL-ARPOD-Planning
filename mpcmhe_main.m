@@ -1,8 +1,23 @@
 %{
-    Unfortunately, I have to write this script.
+    mpcmhe_main.m
+    ===============
+        -> mpcmhe algorithm runner that performs estimation and planning simultaneously
+        -> TODO: fix this up
+            -> remove arpod sensor (we can assume good state)
+            -> get this to solve in closed loop format
 
-    Here's to my sanity.
+    NOTES:
+    ========
+        -> stay within phase 2
+
+
+
+    
+    IMPORT FILES:
+    =============
+        -> mpcmhe_lib
 %}
+delete("tmpC*") %delete any temporary files created
 close all
 clear
 clc
@@ -14,88 +29,43 @@ Mission = ARPOD_Mission;
 traj = [-0.2;-0.2;0.2;0.001;0.001;0.001];
 total_time = 100;
 tstep = 1; % update every second
-Mission.initMission(traj, tstep);
 
 mpc_horizon = 30;
 mhe_horizon = 10;
 
-mpc_Q = [1,0,0,0,0,0;
-        0,1,0,0,0,0;
-        0,0,1,0,0,0;
-        0,0,0,100,0,0;
-        0,0,0,0,100,0;
-        0,0,0,0,0,100];
-mpc_R = 100*eye(3);
-
-mhe_Q = 1e20*eye(6);
-mhe_R = 1e3*eye(3);
-
-stats = MPCMHE_stats;
-
 %setup code before reaching horizon
 window_states = zeros(6,mhe_horizon);
-window_measurements = zeros(3,mhe_horizon);
+window_measurements = zeros(6,mhe_horizon);
 window_controls = zeros(3,mhe_horizon);
 window_phases = zeros(mhe_horizon);
-
-chaserEKF = EKF;
-chaserEKF = chaserEKF.initEKF(traj, 1e-20*eye(6));
 
 Mission = Mission.initMission(traj, tstep);
 phase = Mission.phase;
 
-mpcmhe = MPCMHE_thruster;
-mpcmhe = mpcmhe.setupTensCalc();
-mpcmhe = mpcmhe.init(traj, mhe_horizon, mpc_horizon, tstep);
-%mpcmhe = mpcmhe.tensCalcOpt(mpc_Q,mpc_R,mhe_Q,mhe_R,tstep, 1, 1, ARPOD_Mission.ubar);
+%noise functions...
+noiseQ = @() [0;0;0;0;0;0];
+noiseR = @() [0;0;0;0;0;0];
 
+
+mpcmhe = MpcMheThruster;
+mpcmhe = mpcmhe.init(traj,mhe_horizon,mpc_horizon, tstep, 6, 3);
 for i = tstep:tstep:total_time
-    if phase == 1
-        noiseQ = @() [0;0;0;0;0;0];
-        noiseR = @() mvnrnd([0;0;0], [0.001, 0.001, 0.01]).';
 
-        ekfQ = 1e-20*eye(6);
-        ekfR = diag([0.001,0.001,0.01]);
-    elseif phase == 2
-        noiseQ = @() [0;0;0;0;0;0];
-        noiseR = @() 10*mvnrnd([0;0;0], [0.001, 0.001, 0.01]).';
-
-        ekfQ = 1e-20*eye(6);
-        ekfR = diag([0.001,0.001,0.01]);
-    else
-        noiseQ = @() [0;0;0;0;0;0];
-        noiseR = @() mvnrnd([0;0;0], [0.001, 0.001, 1e-5]).';
-
-        ekfQ = 1e-20*eye(6);
-        ekfR = diag([0.001,0.001,1e-5]);
-    end
-
-    if i/tstep < mhe_horizon
-        % setup the control input as 0
-        u = [0;0;0];
-    else
-
-    end
-    Mission = Mission.nextStep(u,noiseQ, noiseR);
-
-    meas = Mission.sensor;
-    traj = Mission.traj;
-    phase = Mission.phase;
+    %control input
+    u = [0.0;0.0;0.0];
+    Mission = Mission.nextStepMod(u, noiseQ,noiseR);
 
     if i/tstep <= mhe_horizon
-        %setup measurements
-        window_measurements(:,i/tstep) = MPCMHE_thruster.senseModify(meas);
+        window_measurements(:,i/tstep) = Mission.sensor;
+        window_states(:,i/tstep) = Mission.traj;
         window_controls(:,i/tstep) = u;
-        chaserEKF = chaserEKF.estimate(u,meas,ekfQ,ekfR,tstep,phase);
-        window_states(:,i/tstep) = chaserEKF.state;
-        window_phases(i/tstep) = phase;
 
         if i/tstep == mhe_horizon
-            mpcmhe = mpcmhe.initWindows(window_controls, 100*ones(3,mpc_horizon), window_measurements, window_states, 100*ones(6,mpc_horizon), window_phases);
-            mpcmhe = mpcmhe.tensCalcOpt(mpc_Q,mpc_R,mhe_Q,mhe_R,tstep, 1, 1, ARPOD_Mission.ubar);
+            mpcmhe = mpcmhe.setupWindows(window_states, window_measurements, window_controls);
+            mpcmhe = mpcmhe.setupOptimize(0.01,0.01,0.1,200);
+            results = mpcmhe.optimize();
         end
     else
-        error("oof");
+        error("Not Implemented");
     end
-        
 end
