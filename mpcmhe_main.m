@@ -1,7 +1,6 @@
 %{
     BIG TODO:
     ==========
-        -> Support 2d simulation
         -> Support attitude dynamics
         -> Add in time-invariant control Disturbance and benchmark effectiveness
 %}
@@ -25,9 +24,11 @@ tstep = 1;        %each time step is 1 second
 benchmark = ThrusterBenchmark;
 benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude);
 
+%{
+    The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
+%}
 noiseQ = @() [0;0;0;0];
 noiseR = @() [0;0;0;0];
-
 traj0 = [1;1;0.001;0.001];
 benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR);
 

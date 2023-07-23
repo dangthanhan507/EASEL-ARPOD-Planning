@@ -22,8 +22,6 @@ classdef ARPOD_Dynamics
     end
     methods (Static)
         function [A,B] = linearHCWDynamics(T, mu_GM, R, is2D)
-            % mu_GM = ARPOD_Mission.mu;
-            % R = ARPOD_Mission.a;
 
             n = sqrt(mu_GM / (R.^3) );
             A = zeros(6,6);
@@ -103,8 +101,6 @@ classdef ARPOD_Dynamics
             motion = @(t,traj) ARPOD_Dynamics.nonlinearMotion(t, traj, mu_GM, R, u, is2D);
             [ts, trajs] = ode45(motion, 0:tstep, traj0);
             traj = transpose(trajs(length(trajs),:));
-        end
-        function traj = linearMotionSolver(traj0, R, mu_GM, u, tstep, is2D)
         end
         function jacobianMat = motionJacobian(t,traj0, mu_GM, R,u)
             n = sqrt(mu_GM / (R.^3)); %orbital velocity
