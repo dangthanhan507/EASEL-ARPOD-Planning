@@ -1,4 +1,5 @@
 classdef ARPOD_Mission
+    %TODO: clean this up -> AN
     properties (Constant)
         t_e = 14400; % eclipse time (in seconds)
         t_f = 43200; % total mission duration (in seconds)
@@ -14,7 +15,7 @@ classdef ARPOD_Mission
         x_docked = [0;0;0;0;0;0]; % docked position in km, and km/s
         x_relocation = [0;20;0;0;0;0]; %relocation position in km, km/s
         x_partner = [0;30;0;0;0;0]; %partner position in km, km/s
-        ubar = 0.1;
+        ubar = 0.1; % limit of the thrust allowed
     end
     methods (Static)
         function inLOS = isInsideLOS(traj)
@@ -32,7 +33,7 @@ classdef ARPOD_Mission
                 inLOS = 0;
             end
         end
-        function inLOS = isInsideNonlinearLOS(traj)
+        function inLOS = isInsideConeLOS(traj)
             theta = ARPOD_Mission.theta * pi / 180; %docking angle in radians
             rho_d = ARPOD_Mission.rho_d;
             c = rho_d * ARPOD_Mission.c;
@@ -65,39 +66,35 @@ classdef ARPOD_Mission
 
     end
     properties
-        dynamics
+        dynamics % using dynamics from ARPOD_Dynamics
         traj % current trajectory of mission
         sensor % current measurements from sensors
         phase % current phase of mission
         inLOS % boolean as whether it is in or not
         tstep
-
         los_type %type of los, linear or nonlinear
     end
     methods
-        function obj = initMission(obj, traj, tstep)
+        function obj = initMission(obj, traj, tstep, is2D, thruster_type)
             obj.traj = traj;
             obj.phase = ARPOD_Mission.calculatePhase(traj);
             obj.inLOS = ARPOD_Mission.isInsideLOS(traj);
             obj.tstep = tstep;
 
             obj.dynamics = ARPOD_Dynamics;
-            obj.dynamics = obj.dynamics.initDynamics(traj);
+            obj.dynamics = obj.dynamics.initDynamics(traj, is2D, thruster_type);
         end
-        function obj = nextStep(obj, control, system_noise, sensor_noise)
-            obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise, 1);
+        function obj = nextStep(obj, control, system_noise, sensor_noise, useFullSense)
+            obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise);
             obj.traj = obj.dynamics.currentTraj();
 
             obj.phase = ARPOD_Mission.calculatePhase(obj.traj);
-            obj.sensor = ARPOD_Sensor.sense(obj.traj, sensor_noise, obj.phase);
-            obj.inLOS = ARPOD_Mission.isInsideLOS(obj.traj);
-        end
-        function obj = nextStepMod(obj, control, system_noise, sensor_noise)
-            obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise, 1);
-            obj.traj = obj.dynamics.currentTraj();
 
-            obj.phase = ARPOD_Mission.calculatePhase(obj.traj);
-            obj.sensor = ARPOD_Sensor.fullSense(obj.traj, sensor_noise);
+            if useFullSense
+                obj.sensor = ARPOD_Sensor.fullSense(obj.traj, sensor_noise);
+            else
+                obj.sensor = ARPOD_Sensor.sense(obj.traj, sensor_noise, obj.phase);
+            end
             obj.inLOS = ARPOD_Mission.isInsideLOS(obj.traj);
         end
     end

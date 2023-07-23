@@ -82,6 +82,7 @@ classdef MpcMheThruster
                 @params control_dim: scalar representing vector length of control inputs
             %}
 
+            %TensCalc Flags
             obj.version = @class2equilibriumLatentCS;
             obj.codeType = 'C';
             obj.compilerFlags = '-O1';
@@ -123,7 +124,11 @@ classdef MpcMheThruster
             % define dynamics utilized in the controller
             obj.Ak = A;
             obj.Bk = B;
+
+            obj = obj.setupOptimize(0.01, 0.01, 0.1, 200);
         end
+
+        %QUESTION: will we need to use nonlinear version (RK-4)?
         function xDynamics = setupDynamicConstraints(obj)
             %{
                 Description:
@@ -153,6 +158,9 @@ classdef MpcMheThruster
             %return
             xDynamics = (obj.Tx == obj.Ak*xk + obj.Bk*(u+obj.Td));
         end
+
+        %QUESTION: Will we want to use an MPC-MHE which moves its measurement constraints up into the 
+        %           objective function?
         function yConstr = setupSensorConstr(obj)
             %{
                 Description:
@@ -251,7 +259,6 @@ classdef MpcMheThruster
 
             %{
                 creating optimization problem for MPC-MHE
-
             %}
             classname=obj.version(...
                 'classname','tmpC_target_chaser_main',...
@@ -287,7 +294,26 @@ classdef MpcMheThruster
         end
         function obj = setupWindows(obj, window_states, window_measurements, window_controls)
             %{
+                Description:
+                ------------
+                MPC-MHE works with window data structures.
+                This does the first-time setup of the windows for MPC-MHE to work with on the ego.
+                After this, the windows should be handled internally and then passed 
+                Parameters:
+                -----------
+                @params window_states       : (S, N_mhe) matrix representing states for MHE.
+                @params window_measurements : (M, N_mhe) matrix representing measurements for MHE.
+                @params window_controls     : (C, N_mhe) matrix representing past control for MHE.
 
+                S     = dimension of state vector
+                M     = dimension of sensor
+                C     = dimension of control vector
+                N_mhe = obj.mhe_horizon (how far back to look for mhe)
+
+                Returns:
+                --------
+                Class instance with updated windows ready to work with tenscalc optimization.
+                Can call optimize() now.
             %}
             [control_dim, n] = size(window_controls);
             [state_dim, n] = size(window_states);
@@ -466,6 +492,12 @@ classdef MpcMheThruster
                 much be useless.
             %}
             u = obj.window_mpccontrols(:,1);
+        end
+        function x = getMHEState(obj)
+            %{
+                TODO: Add Docstring
+            %}
+            x = obj.window_mhestates(:,end);
         end
         %{
             TODO: implement a runController(meas,control) that outputs current estimated state and controls

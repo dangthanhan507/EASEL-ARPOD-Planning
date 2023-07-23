@@ -12,7 +12,7 @@ classdef ARPOD_Sensor
             e3 = norm;
             z_t = [e1;e2;e3];
         end
-        function z_t = Tmeasure(state)
+        function z_t = Tmeasure(state) %TensCalc Supported Measurement function
             x = state(1,:);
             y = state(2,:);
             z = state(3,:);
@@ -31,7 +31,7 @@ classdef ARPOD_Sensor
             e3 = norm;
             z_t = [e1;e2;e3];
         end
-        function dz_t = measureJacobian(state)
+        function dz_t = measureJacobian(state) %take jacobian of measurement function (used on EKF)
             x = state(1);
             y = state(2);
             z = state(3);
