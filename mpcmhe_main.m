@@ -2,16 +2,13 @@
     mpcmhe_main.m
     ===============
         -> mpcmhe algorithm runner that performs estimation and planning simultaneously
-        -> TODO: fix this up
-            -> remove arpod sensor (we can assume good state)
-            -> get this to solve in closed loop format
 
-    NOTES:
-    ========
-        -> stay within phase 2
-
-
-
+    
+    BIG TODO:
+    ==========
+        -> Support 2d simulation
+        -> Support attitude dynamics
+        -> Add in time-invariant control Disturbance and benchmark effectiveness
     
     IMPORT FILES:
     =============
@@ -22,6 +19,7 @@ close all
 clear
 clc
 
+%fixes randomness for reproducibility of any plots
 rng(1);
 
 Mission = ARPOD_Mission;
@@ -47,14 +45,14 @@ noiseQ = @() [0;0;0;0;0;0];
 noiseR = @() [0;0;0;0;0;0];
 
 
+[A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep);
 mpcmhe = MpcMheThruster;
-mpcmhe = mpcmhe.init(traj,mhe_horizon,mpc_horizon, tstep, 6, 3);
+mpcmhe = mpcmhe.init(traj,mhe_horizon,mpc_horizon, A, B, 6, 3);
 
 u = [0.0;0.0;0.0];
 for i = tstep:tstep:total_time
 
     %control input
-
     Mission = Mission.nextStepMod(u, noiseQ,noiseR);
 
 
@@ -73,13 +71,12 @@ for i = tstep:tstep:total_time
             u = mpcmhe.getMPCControl();
         end
     else
-        %needs window shift
+        %this is the main MPCMHE running.
         meas = Mission.sensor;
         control = u;
         mpcmhe = mpcmhe.shiftWindows(meas,control);
         mpcmhe = mpcmhe.optimize();
         u = mpcmhe.getMPCControl();
-        disp(Mission.traj);
-        disp(u);
     end
 end
+delete("tmpC*") %delete any temporary files created

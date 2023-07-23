@@ -50,8 +50,8 @@ classdef MpcMheThruster
         Tvback
         Tuforward
 
-        hcwA % discrete HCW dynamics matrix for state
-        hcwB % discrete HCW dynamics matrix for control input
+        Ak % invariant discrete dynamics matrix for state
+        Bk % invariant discrete dynamics matrix for control input
 
         % misalignment variables
         % TODO: not there yet... lets get there
@@ -59,7 +59,7 @@ classdef MpcMheThruster
         b_x %additive bias
     end
     methods
-        function obj = init(obj, x0_, backwardT, forwardT, tstep, meas_dim, control_dim)
+        function obj = init(obj, x0_, backwardT, forwardT, A, B, meas_dim, control_dim)
             %{
                 Description:
                 ------------
@@ -76,7 +76,8 @@ classdef MpcMheThruster
                 -----------
                 @params backwardT:   backward facing time window (scalar)
                 @params forwardT:    forward facing time window (scalar)
-                @params tstep:       number of seconds per timestep (scalar)
+                @params A        :   propagation dynamics matrix for the state
+                @params B        :   propagation dynamics matrix for the control input
                 @params meas_dim:    scalar representing vector length of sensor measurements
                 @params control_dim: scalar representing vector length of control inputs
             %}
@@ -120,7 +121,8 @@ classdef MpcMheThruster
 
 
             % define dynamics utilized in the controller
-            [obj.hcwA,obj.hcwB] = ARPOD_Dynamics.linearHCWDynamics(tstep);
+            obj.Ak = A;
+            obj.Bk = B;
         end
         function xDynamics = setupDynamicConstraints(obj)
             %{
@@ -149,7 +151,7 @@ classdef MpcMheThruster
             u = [obj.Tuback, obj.Tuforward];
 
             %return
-            xDynamics = (obj.Tx == obj.hcwA*xk + obj.hcwB*(u+obj.Td));
+            xDynamics = (obj.Tx == obj.Ak*xk + obj.Bk*(u+obj.Td));
         end
         function yConstr = setupSensorConstr(obj)
             %{
@@ -342,7 +344,7 @@ classdef MpcMheThruster
             %shift and use obj.window_mpcstates as a "predicted variable" for warm-start
             obj.window_mhestates = [obj.window_mhestates(:,2:end), obj.window_mpcstates(:,1)];
             %propagate zero control input thrust as warm-start for last element
-            obj.window_mpcstates = [obj.window_mpcstates(:,2:end), obj.hcwA*obj.window_mpcstates(:,end)];
+            obj.window_mpcstates = [obj.window_mpcstates(:,2:end), obj.Ak*obj.window_mpcstates(:,end)];
 
             %assume last element no control disturbance for warm-start
             [dim,n] = size(obj.window_controlDisturbances);
@@ -465,5 +467,11 @@ classdef MpcMheThruster
             %}
             u = obj.window_mpccontrols(:,1);
         end
+        %{
+            TODO: implement a runController(meas,control) that outputs current estimated state and controls
+
+            for benchmarking, it's goiing to be useful to perform some type of docktyping/polymorphism
+            every class we want to benchmark MUST follow this format which will allow for easier plots.
+        %}
     end
 end
