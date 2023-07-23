@@ -1,10 +1,18 @@
+% ============================================================
+% MpcMheThruster.m
+% 
+% This code centralizes in the utilization of MPC-MHE for
+% the thruster misalignment problem. MHE performs state
+% estimation while MPC performs control optimization.
+% This is a research implementation using TensCalc as its
+% base library to perform min-max optimization.
+%
+%
+% Author: An Dang, David Copp
+%
+% ============================================================
+
 classdef MpcMheThruster
-    %{
-        MPCMHE problem working with the ARPOD problem.
-        A full abstraction that should allow for modifications
-
-
-    %}
     properties
         %TensCalc Specific parameters
         version
@@ -12,28 +20,28 @@ classdef MpcMheThruster
         compilerFlags
 
         % window of stuff to consider
-        window_mhecontrols
-        window_mpccontrols
 
-        window_measurements
+        %mhe windows
+        window_mhecontrols %parameter in the estimation
+        window_measurements%parameter in the estimation
+        window_mhestates   %decision variable in optimization
+        window_measError   %decision variable in optimization
+        window_controlDisturbances % decision variable in optimization
 
-        window_mhestates
-        window_mpcstates
+        %mpc windows
+        window_mpccontrols %decision variable in optimization
+        window_mpcstates   %decision variable in optimiation
 
-        window_controlDisturbances
-        window_measError
-
-        window_phase
 
         % pertinent information regarding algorithm
-        x0
+        x0 %this is a variable we set to not change during optimization of mpc-mhe
         backwardT
         forwardT
 
         % tens calc optimizer
         opt
 
-        %T variables from tenscalc
+        %Tenscalc variables
         Tx0
         Tx
         Td
@@ -46,8 +54,7 @@ classdef MpcMheThruster
         hcwB % discrete HCW dynamics matrix for control input
 
         % misalignment variables
-        % not there yet
-        % TODO: lets get there
+        % TODO: not there yet... lets get there
         A_x %matrix bias
         b_x %additive bias
     end
@@ -67,9 +74,11 @@ classdef MpcMheThruster
                 
                 Parameters
                 -----------
-                @params backwardT: backward facing time window (scalar)
-                @params forwardT:  forward facing time window (scalar)
-                @params tstep:     number of seconds per timestep (scalar)
+                @params backwardT:   backward facing time window (scalar)
+                @params forwardT:    forward facing time window (scalar)
+                @params tstep:       number of seconds per timestep (scalar)
+                @params meas_dim:    scalar representing vector length of sensor measurements
+                @params control_dim: scalar representing vector length of control inputs
             %}
 
             obj.version = @class2equilibriumLatentCS;
@@ -173,8 +182,8 @@ classdef MpcMheThruster
                     -> this is because we tried using the ARPOD sensor measurements
                         and it didn't work out too well. (infeasible optimization)
                     
-                    -> if there is interest in using ARPOD code talk to An. He has done this before
-                        and can show you how to reproduce the code.
+                    -> if there is interest in using ARPOD Sensor code talk to An. He has 
+                        done this before and can show you how to reproduce the code.
             %}
 
             xk = obj.Tx(:,1:obj.backwardT);
@@ -297,13 +306,62 @@ classdef MpcMheThruster
             obj.window_mpcstates = zeros(state_dim, obj.forwardT);
  
         end
-        function obj = shiftWindows(obj, measurement, controls)
+        function obj = shiftWindows(obj, measurement, control)
             %{
-                TODO: write this
+                Description:
+                ------------
+                Everything in the MPC-MHE class relies on the maintaining of
+                its windows data structures. 
+
+                We opt to shift the window data structures everytime we receive
+                a measurement and control input.
+
+                Parameters:
+                -----------
+                @params measurement: (M,1) vector representing incoming sensor measurement
+                @params control    : (D,1) vector representing recent control input used
+
+                M: dimension of sensor measurement.
+                D: dimension of control input.
+
+                Returns:
+                --------
+                class instance with its window data structures shifted.
+
+
+                Access Notes:
+                --------------
+                Other than setupWindows()...,
+                Ideally this will be the only function called before we call 
+                setupOptimize() and optimize().
             %}
-            error("TODO: implement this!");
+            
+
+            obj.x0 = obj.window_mhestates(:,1);
+
+            %shift and use obj.window_mpcstates as a "predicted variable" for warm-start
+            obj.window_mhestates = [obj.window_mhestates(:,2:end), obj.window_mpcstates(:,1)];
+            %propagate zero control input thrust as warm-start for last element
+            obj.window_mpcstates = [obj.window_mpcstates(:,2:end), obj.hcwA*obj.window_mpcstates(:,end)];
+
+            %assume last element no control disturbance for warm-start
+            [dim,n] = size(obj.window_controlDisturbances);
+            obj.window_controlDisturbances = [obj.window_controlDisturbances(:,2:end), zeros(dim,1)];
+
+            %assume no measError on last element for warm-start
+            [dim,n] = size(obj.window_measError);
+            obj.window_measError = [obj.window_measError(:,2:end), zeros(dim,1)];
+
+            %push mhecontrols with new control input
+            %assume no new thrust at tail end of mpc
+            [dim,n] = size(obj.window_mpccontrols);
+            obj.window_mhecontrols = [obj.window_mhecontrols(:,2:end), control];
+            obj.window_mpccontrols = [obj.window_mpccontrols(:,2:end), zeros(dim,1)];
+
+            %push new measurement into mhe measurements
+            obj.window_measurements = [obj.window_measurements(:,2:end), measurement];
         end
-        function [mheXs, mheDs, vs, mpcXs, mpcUs] = optimize(obj)
+        function obj = optimize(obj)
             %{
                 Description:
                 ------------
@@ -316,16 +374,9 @@ classdef MpcMheThruster
                 N/A
 
                 Returns:
-                --------
-                @return mheXs: states estimated by MHE [N, backwardT]
-                @return mheDs: control input error estimated by MHE [N, backwardT]
-                @return vs   : measurement error estimated by MHE [C, backwardT]
-                @return mpcXs: states for optimal path created by MPC [N, forwardT]
-                @return mpcUs: control inputs used for optimal path created by MPC [M, forwardT]
-
-                N: dimension of state
-                M: dimension of control input
-                C: dimension of sensor measurement
+                -----------
+                Saves results of optimization into class instance.
+                Look at getOptimizeResult() for full list of variables that optimization gets.
             %}
 
             %define parameters used in TensCalc optimizer
@@ -341,14 +392,78 @@ classdef MpcMheThruster
             setV_vback(obj.opt, obj.window_measError);
 
             mu0 = 1;
-            maxIter = 1;
+            maxIter = 100;
             saveIter = -1;
 
+            %TODO: parse the status, iter, and time for anything useful to know (throw errors if necessary)
             [status, iter, time] = solve(obj.opt, mu0, int32(maxIter), int32(saveIter));
             [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(obj.opt); %get results
 
             mheXs = xs(:,1:obj.backwardT);
             mpcXs = xs(:,obj.backwardT+1:end);
+
+
+            %save everything into mpcmhe
+            obj.window_controlDisturbances = mheDs;
+            obj.window_measError   = vs;
+            obj.window_mhestates   = mheXs;
+            obj.window_mpcstates   = mpcXs;
+            obj.window_mpccontrols = mpcUs;
+        end
+        function [mheXs, mheDs, mheVs, mpcXs, mpcUs] = getOptimizeResult(obj)
+            %{
+                Description:
+                ------------
+                Returns everything optimize() gets you. This function exists
+                as a design detail where we want to keep everything inside of th
+                class object. Then we can access the internals of the class through getter
+                methods. This keeps the code concise and abstracted.
+
+                Parameters:
+                -----------
+                N/A
+
+                Returns:
+                --------
+                @return mheXs: states estimated by MHE [N, backwardT]
+                @return mheDs: control input error estimated by MHE [N, backwardT]
+                @return mheVs: measurement error estimated by MHE [C, backwardT]
+                @return mpcXs: states for optimal path created by MPC [N, forwardT]
+                @return mpcUs: control inputs used for optimal path created by MPC [M, forwardT]
+
+                N: dimension of state
+                M: dimension of control input
+                C: dimension of sensor measurement
+
+                Access Notes:
+                -------------
+                Only call this after calling optimize(). Otherwise, you will not get
+                results stored in the window objects and what this returns will pretty
+                much be useless.
+            %}
+            mheXs = obj.window_mhestates;
+            mheDs = obj.window_controlDisturbances;
+            mheVs = obj.window_measError;
+            mpcXs = obj.window_mpcstates;
+            mpcUs = obj.window_mpccontrols;
+        end
+        function u = getMPCControl(obj)
+            %{
+                Description:
+                ------------
+                Getter method to access MPC optimized contorl input
+
+                Parameters:
+                -----------
+                N/A
+
+                Access Notes:
+                -------------
+                Only call this after calling optimize(). Otherwise, you will not get
+                results stored in the window objects and what this returns will pretty
+                much be useless.
+            %}
+            u = obj.window_mpccontrols(:,1);
         end
     end
 end

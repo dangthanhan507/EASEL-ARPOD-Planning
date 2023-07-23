@@ -26,7 +26,7 @@ rng(1);
 
 Mission = ARPOD_Mission;
 
-traj = [-0.2;-0.2;0.2;0.001;0.001;0.001];
+traj = [1;1;-1;0.001;0.001;0.001];
 total_time = 100;
 tstep = 1; % update every second
 
@@ -49,23 +49,37 @@ noiseR = @() [0;0;0;0;0;0];
 
 mpcmhe = MpcMheThruster;
 mpcmhe = mpcmhe.init(traj,mhe_horizon,mpc_horizon, tstep, 6, 3);
+
+u = [0.0;0.0;0.0];
 for i = tstep:tstep:total_time
 
     %control input
-    u = [0.0;0.0;0.0];
+
     Mission = Mission.nextStepMod(u, noiseQ,noiseR);
 
+
     if i/tstep <= mhe_horizon
+        %this is setup code when we still need to fill up data for the MHE horizon
         window_measurements(:,i/tstep) = Mission.sensor;
         window_states(:,i/tstep) = Mission.traj;
         window_controls(:,i/tstep) = u;
 
         if i/tstep == mhe_horizon
+            %finally filled up mhe horizon with datapoints.
+            %perform optimization and get our first real MPC output
             mpcmhe = mpcmhe.setupWindows(window_states, window_measurements, window_controls);
             mpcmhe = mpcmhe.setupOptimize(0.01,0.01,0.1,200);
-            results = mpcmhe.optimize();
+            mpcmhe = mpcmhe.optimize();
+            u = mpcmhe.getMPCControl();
         end
     else
-        error("Not Implemented");
+        %needs window shift
+        meas = Mission.sensor;
+        control = u;
+        mpcmhe = mpcmhe.shiftWindows(meas,control);
+        mpcmhe = mpcmhe.optimize();
+        u = mpcmhe.getMPCControl();
+        disp(Mission.traj);
+        disp(u);
     end
 end
