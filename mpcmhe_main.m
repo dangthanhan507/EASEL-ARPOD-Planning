@@ -13,7 +13,7 @@ clc
 rng(1);
 
 
-use2D = true;
+use2D = false;
 useNonlinear = true;
 useAttitude = false;
 mpc_horizon = 30;
@@ -23,13 +23,14 @@ tstep = 1;        %each time step is 1 second
 
 benchmark = ThrusterBenchmark;
 benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude);
-
 %{
     The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
 %}
-noiseQ = @() [0;0;0;0];
-noiseR = @() [0;0;0;0];
-traj0 = [1;1;0.001;0.001];
-benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR);
+noiseQ = @() [0;0;0;0;0;0];
+noiseR = @() [0;0;0;0;0;0];
+traj0 = [1;1;-1;0.001;0.001;0.001];
+
+disturbance = [0.05;0.05;0.05];
+benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance);
 
 delete("tmpC*") %delete any temporary files created

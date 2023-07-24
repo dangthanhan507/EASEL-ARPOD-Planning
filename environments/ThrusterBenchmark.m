@@ -77,7 +77,7 @@ classdef ThrusterBenchmark
             obj.mpc_horizon = mpc_horizon;
 
         end
-        function obj = runBenchmark(obj, traj0, noiseQ, noiseR)
+        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance)
             %{
                 TODO: fill this docstring
                 Description:
@@ -89,6 +89,7 @@ classdef ThrusterBenchmark
                 @params traj0
                 @params noiseQ
                 @params noiseR
+                @params disturbance
 
 
                 Returns:
@@ -156,7 +157,7 @@ classdef ThrusterBenchmark
             obj.measurements    = zeros(state_dim,  num_steps);
             obj.control_vectors = zeros(control_dim, num_steps);
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
-                Mission = Mission.nextStep(u,noiseQ,noiseR,true);
+                Mission = Mission.nextStep(u + disturbance,noiseQ,noiseR,true);
                 true_traj = Mission.traj;
                 meas = Mission.sensor;
 

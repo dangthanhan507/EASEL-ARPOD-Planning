@@ -125,7 +125,7 @@ classdef MpcMheThruster
             obj.Ak = A;
             obj.Bk = B;
 
-            obj = obj.setupOptimize(0.01, 0.01, 0.1, 200);
+            obj = obj.setupOptimize(0.05, 0.05, 0.1, 200);
         end
 
         %QUESTION: will we need to use nonlinear version (RK-4)?
@@ -226,7 +226,7 @@ classdef MpcMheThruster
             %}
             J = 10*norm2(obj.Tx(:,obj.backwardT+1:obj.forwardT));
             J = J + 10*norm2(obj.Tuforward);
-            J = J - 10*norm2(obj.Td) - 100*norm2(obj.Tvback);
+            J = J - 100*norm2(obj.Td) - 10*norm2(obj.Tvback);
         end
         function obj = setupOptimize(obj, vMax, dMax, uMax, maxIter)
             %{
