@@ -15,10 +15,12 @@ import numpy as np
         https://github.com/iclavera/learning_to_adapt/tree/master
 
 '''
-def createHCWMatrices(T, mu_GM, R):
+def createHCWDiscreteMatrices(T, mu_GM, R):
+    '''
+    '''
     n = np.sqrt(mu_GM / (R*R*R))
-    A = np.zeros(6,6)
-    B = np.zeros(6,3)
+    A = np.zeros((6,6))
+    B = np.zeros((6,3))
 
     S = np.sin(n*T)
     C = np.cos(n*T)
@@ -39,11 +41,29 @@ def createHCWMatrices(T, mu_GM, R):
 
     return A,B
 
+def createHCWMatrices(T, mu_GM, R):
+    '''
+        Create HCW matrices
+    '''
+    n = np.sqrt(mu_GM / (R*R*R))
+
+
+    #creating A matrix
+    A = np.hstack((np.zeros((3,3)),np.eye(3)))
+    #bottom left and bottom right part of A matrix
+    BL = np.array([[3*n*n, 0, 0],[0,0,0],[0,0,-n*n]])
+    BR = np.array([[0,2*n,0],[-2*n,0,0],[0,0,0]])
+    lowerA = np.hstack((BL,BR))
+    A = np.vstack((A,lowerA))
+    B = np.vstack((np.zeros((3,3)), np.eye(3)))
+
+    return A,B
+
 
 class ModifiedControlNetwork(nn.Module):
     def __init__(self, T, mu_GM, R):
         super().__init__()
-        self.A, self.B = createHCWMatrices(T,mu_GM,R)
+        self.A, self.B = createHCWDiscreteMatrices(T,mu_GM,R)
 
         self.layers = []
         self.layers.append(nn.Linear(9,64))
