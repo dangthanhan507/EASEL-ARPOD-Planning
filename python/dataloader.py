@@ -1,11 +1,11 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import os
 class DynamicsDataset(Dataset):
     def __init__(self, folder):
         
-        self.datas = torch.load(os.path.join(folder, "hcw_input.pt"))
-        self.labels = torch.load(os.path.join(folder, "hcw_labels.pt"))
+        self.datas = torch.load(os.path.join(folder, "hcw_input.pt")).to(torch.float32)
+        self.labels = torch.load(os.path.join(folder, "hcw_labels.pt")).to(torch.float32)
 
     #overloaded operatiosn (REQUIRED for inheritance)
     def __getitem__(self, idx):
@@ -15,4 +15,6 @@ class DynamicsDataset(Dataset):
 
 
 if __name__ == '__main__':
-    pass
+    dataset = DynamicsDataset('./dataset/')
+    dataloader = DataLoader(dataset,shuffle=True,num_workers=4,batch_size=100,pin_memory=False)
+    print('Done Loading Dataset\n')
