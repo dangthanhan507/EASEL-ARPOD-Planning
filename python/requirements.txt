@@ -1,0 +1,6 @@
+#make sure python >= 3.9
+torch
+numpy
+matplotlib
+l4casadi
+casadi

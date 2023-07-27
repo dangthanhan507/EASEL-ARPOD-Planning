@@ -43,4 +43,3 @@ class SimpleDynamicsNetwork(nn.Module):
         '''
         '''
         return self.model(inp)
-
