@@ -1,5 +1,4 @@
 import torch
-from torch.utils.data import Dataset
 
 from arpod_dynamics import createHCWMatrices, createHCWDiscreteMatrices
 from controller import LQR
@@ -102,18 +101,6 @@ def save_data(datas, labels):
     os.makedirs('./dataset/',exist_ok=True)
     torch.save(datas, './dataset/hcw_input.pt')
     torch.save(labels,'./dataset/hcw_labels.pt')
-
-
-class DynamicsDataset(Dataset):
-    def __init__(self, A, B):
-        pass
-
-    #overloaded operatiosn (REQUIRED for inheritance)
-    def __getitem__(self, idx):
-        pass
-    def __len__(self):
-        pass
-
 
 if __name__ == '__main__':
     load_data = True
