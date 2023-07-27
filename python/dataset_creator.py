@@ -5,6 +5,7 @@ from arpod_dynamics import createHCWMatrices, createHCWDiscreteMatrices
 from controller import LQR
 import numpy as np
 from tqdm import tqdm
+import os
 
 def runClassicARPODMission(lqr, Ak, Bk, x0):
     '''
@@ -33,30 +34,16 @@ def runRandomHCW(Ak, Bk, pos_limits = (-10,10), vel_limits= (-1,1), n_samples=1e
     '''
 
     '''
-    input_datapts = []
-    label_datapts = []
-
     pos_lb, pos_hb = pos_limits
     vel_lb, vel_hb = vel_limits
 
-    
-    iter = 0
-    while iter < n_samples:
-        pos = np.random.uniform(low=pos_lb, high=pos_hb, size=(3,1))
-        vel = np.random.uniform(low=vel_lb, high=vel_hb, size=(3,1))
-        u = np.random.uniform(low=-0.1,high=0.1,size=(3,1))
-        x = np.vstack((pos,vel))
-
-        x1 = Ak@x + Bk@(u)
-
-        input_data = np.vstack((x,u))
-        label_data = x1.copy()
-        input_datapts.append(input_data)
-        label_datapts.append(label_data)
-        
-        iter += 1
-
-    return np.array(input_datapts).squeeze(), np.array(label_datapts).squeeze()
+    n_samples = int(n_samples)
+    pos = np.random.uniform(low=pos_lb, high=pos_hb, size=(3,n_samples))
+    vel = np.random.uniform(low=vel_lb, high=vel_hb, size=(3,n_samples))
+    x = np.vstack((pos,vel)) #6xN
+    u = np.random.uniform(low=-0.1,high=0.1,size=(3,n_samples)) #3xN
+    x1 = Ak@x + Bk@u #6xN
+    return np.vstack((x,u)).T, x1.T
 
 def createHCWDatapoints(mu_GM, R, tstep, n_datapoints=1e6, pos_limits = (-10,10), vel_limits = (-1,1)):
     Ak,Bk = createHCWDiscreteMatrices(tstep, mu_GM, R)
@@ -109,7 +96,12 @@ def createArpodDatapoints(mu_GM, R, tstep,n_simulations=1000, pos_limits = (-10,
     return datas, labels
 
 def save_data(datas, labels):
-    
+    datas = torch.tensor(datas)
+    labels = torch.tensor(labels)
+
+    os.makedirs('./dataset/',exist_ok=True)
+    torch.save(datas, './dataset/hcw_input.pt')
+    torch.save(labels,'./dataset/hcw_labels.pt')
 
 
 class DynamicsDataset(Dataset):
@@ -124,7 +116,17 @@ class DynamicsDataset(Dataset):
 
 
 if __name__ == '__main__':
-    mu_GM = 1000
-    R =  100
-    datas, labels = createHCWDatapoints(mu_GM,R,1)
+    load_data = True
+    
+    if not load_data:
+        mu_GM = 1000
+        R =  100
+        datas, labels = createHCWDatapoints(mu_GM,R,tstep=1,n_datapoints=2e7) #allocates a few GiBs of space
+        print(datas.shape, labels.shape)
+        save_data(datas, labels)
+    else:
+        datas = torch.load('./dataset/hcw_input.pt')
+        labels = torch.load('./dataset/hcw_labels.pt')
+        print(datas.shape)
+        print(labels.shape)
     
