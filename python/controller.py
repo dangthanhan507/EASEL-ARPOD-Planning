@@ -7,12 +7,8 @@ from arpod_dynamics import createHCWMatrices, createHCWDiscreteMatrices
 import control
 import numpy as np
 
-'''
-'''
-class QP_MPC:
-    def __init__(self):
-        pass
-
+import casadi   as cs
+import l4casadi as l4c
 
 '''
     LQR utilized for ARPOD rendezvous
@@ -34,6 +30,58 @@ class LQR:
         u[u>=0.1] = 0.1
         u[u<=-0.1] = -0.1
         return u
+
+'''
+NOTES:
+    SX is symbolic expression for Symbolic differentiation (limited to binary, unary, and scalar operation)
+    MX is matrix expression (not limited)
+'''
+class NN_MPC:
+    #MPC using neural network as complete replacement for dynamics
+    #max thrust is 0.1
+    def __init__(self, tstep, Q, R, horizon, network):
+        self.dt = tstep
+        self.horizon = horizon
+        self.network = network
+        self.Q = Q
+        self.R = R
+
+        self.x_dim = Q.shape[0]
+        self.u_dim = R.shape[0]
+
+    def fn_objective(self, x, u, Q, R):
+        #discrete objective
+        L = cs.sum1(cs.SX(np.diag(Q))*(x*x)) + cs.sum1(cs.SX(np.diag(R))*(u*u))
+        return L
+    def fn_constr(self):
+        pass
+
+    def extract_solution(self,sol):
+        solution  = np.array(sol)
+        final_x_idx = self.x_dim*self.horizon
+
+        xs = solution[0:final_x_idx]
+        us = solution[final_x_idx:]
+        x = xs.reshape((6,-1))
+        u = us.reshape((3,-1))
+        return x,u
+    def optimize(self, state):
+        u = cs.SX.sym('u',self.u_dim,self.horizon)
+        x = cs.SX.sym('x',self.x_dim,self.horizon)
+        # x0 = cs.SX(state)
+        L = self.fn_objective(x,u,self.Q,self.R)
+
+        #setup optimization problem (objective + constraints) + solver
+
+        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))
+        nlp = cs.nlpsol('nlp','ipopt', {'x': opt_x, 'g': })
+
+        #solve
+        solution = nlp()
+        x,u = self.extract_solution(solution['x'])
+        return x,u
+
+
 
 
 if __name__ == '__main__':
