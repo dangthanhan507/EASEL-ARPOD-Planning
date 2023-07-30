@@ -47,6 +47,8 @@ class NN_MPC:
     def __init__(self, tstep, Q, R, horizon, network):
         self.dt = tstep
         self.horizon = horizon
+
+        self.net_net = network
         self.network = l4c.L4CasADi(network,has_batch=False,device='cpu')
         self.Q = Q
         self.R = R
@@ -67,28 +69,37 @@ class NN_MPC:
 
         #stack x,u
         inp_net = cs.vertcat(x, u)
+        print(inp_net.shape)
         out = self.network(inp_net.T)
 
         #(6,N)
         return out.T
     
+
+    def fn_normal_dynamics(self, x0, x, u):
+        xs = cs.horzcat(x0,x[:,:-1]) # (x0.... xn-1)
+        A,B = createHCWDiscreteMatrices(1,1000,100)
+        dyn_x = A@xs + B@u
+        return (dyn_x - x).reshape((-1,1))
+    
     def fn_dynamic_constr(self, x0, x, u):
+        #x = (x1.... xn)
         xs = cs.horzcat(x0,x[:,:-1]) # (x0.... xn-1)
 
         dyn_x = self.prop_network(xs,u) # predicted (x1... xn)
 
         # xk+1 = f(xk,uk)
-        # returns f(xk,uk)-xk+1 = 0 flattened 
-        return (x - dyn_x).reshape((-1,1))
+        # returns xk+1 - f(xk,uk) = 0 flattened 
+        return (dyn_x - x).reshape((-1,1))
     
     def fn_decision_constr(self, x, u):
         #setup decision variable limits
         m,n = x.shape
-        ubx = (np.ones(m*n)*np.inf).tolist()
-        lbx = (np.ones(m*n)*-np.inf).tolist()
+        ubx =  [cs.inf]*(m*n)
+        lbx = [-cs.inf]*(m*n)
         m,n = u.shape
-        ubu = (np.ones(m*n)*0.1).tolist()
-        lbu = (np.ones(m*n)*-0.1).tolist()
+        ubu = [0.1]*(m*n)
+        lbu = [-0.1]*(m*n)
 
         ub_d = ubx + ubu
         lb_d = lbx + lbu
@@ -133,7 +144,7 @@ class NN_MPC:
         # lbg    = cs.MX(np.zeros(dyn_x.shape[0]))
         # ubg    = cs.MX(np.zeros(dyn_x.shape[0]))
         ubx,lbx = self.fn_decision_constr(x,u)
-        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))    
+        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))
 
 
         #NOTE: ipopt struggles with neural network
@@ -145,9 +156,19 @@ class NN_MPC:
         initial_guess = np.zeros(opt_x.shape[0]).tolist()
         #solve
         solution = solver(x0=initial_guess, lbx=lbx,ubx=ubx,lbg=0,ubg=0)
-        
-        print(solution['x'])
+        print(solution['g'])
         x,u = self.extract_solution(solution['x'])
+
+        #TEST: should be deleted after.
+        xk = np.hstack((state,x[:,:-1]))
+        xk1 = x
+        import torch
+        inp = torch.Tensor(np.vstack((xk,u))).T
+        out = self.net_net(inp).T
+        print(out.numpy()[:,0])
+        print(xk1[:,0])
+
+        input()
         return x,u
 
 
