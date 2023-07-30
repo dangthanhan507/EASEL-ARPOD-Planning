@@ -33,7 +33,7 @@ class LQR:
 
 '''
 NOTES:
-    SX is symbolic expression for Symbolic differentiation (limited to binary, unary, and scalar operation)
+    SX is symbolic expression for Symbolic so  (limited to binary, unary, and scalar operation)
     MX is matrix expression (not limited)
 
     neural networks only use MX so we stuck with that :(
@@ -135,13 +135,16 @@ class NN_MPC:
         ubx,lbx = self.fn_decision_constr(x,u)
         opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))    
 
-        options = {'ipopt.print_level': 1}
-        solver = cs.nlpsol('solver','ipopt', {'f': L(x,u), 'x': opt_x, 'g': dyn_x}, options)
-        print(solver)
 
-        initial_guess = cs.MX(np.zeros(opt_x.shape[0]))
+        #NOTE: ipopt struggles with neural network
+        #      qpsol is good since neural network has no activation function
+        #      use sqpmethod if neural network uses nonlinear functions inside of it
+        options = {}
+        solver = cs.qpsol('solver','qpoases', {'f': L(x,u), 'x': opt_x, 'g': dyn_x}, options)
+
+        initial_guess = np.zeros(opt_x.shape[0]).tolist()
         #solve
-        solution = solver(lbx=lbx,ubx=ubx,lbg=0,ubg=0)
+        solution = solver(x0=initial_guess, lbx=lbx,ubx=ubx,lbg=0,ubg=0)
         
         print(solution['x'])
         x,u = self.extract_solution(solution['x'])
