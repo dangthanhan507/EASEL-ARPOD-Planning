@@ -1,6 +1,5 @@
 import torch
 
-
 # import l4casadi as l4c
 # import casadi
 # if __name__ == '__main__':
@@ -21,12 +20,15 @@ import torch
 from controller import NN_MPC
 import numpy as np
 if __name__ == '__main__':
+
+    device = 'cpu'
+    network = torch.load('./models/hcw_simple_model.pt').to(device)
     Q = np.eye(6)
     R = np.eye(3)
 
     x0 = np.ones((6,1))*100
-    mpc = NN_MPC(1,Q,R,10,None)
-    x = mpc.optimize(x0)
+    mpc = NN_MPC(1,Q,R,10,network)
+    x,u = mpc.optimize(x0)
     print(x)
     
 

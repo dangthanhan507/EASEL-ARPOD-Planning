@@ -35,26 +35,61 @@ class LQR:
 NOTES:
     SX is symbolic expression for Symbolic differentiation (limited to binary, unary, and scalar operation)
     MX is matrix expression (not limited)
+
+    neural networks only use MX so we stuck with that :(
 '''
 class NN_MPC:
     #MPC using neural network as complete replacement for dynamics
-    #max thrust is 0.1
+    #max thrust is 0.
     def __init__(self, tstep, Q, R, horizon, network):
         self.dt = tstep
         self.horizon = horizon
-        self.network = network
+        self.network = l4c.L4CasADi(network,has_batch=False,device='cpu')
         self.Q = Q
         self.R = R
 
         self.x_dim = Q.shape[0]
         self.u_dim = R.shape[0]
 
-    def fn_objective(self, x, u, Q, R):
-        #discrete objective
-        L = cs.sum1(cs.SX(np.diag(Q))*(x*x)) + cs.sum1(cs.SX(np.diag(R))*(u*u))
-        return L
-    def fn_constr(self):
-        pass
+    def fn_objective(self, Q, R):
+        #convert x_fn into usable function for objective
+
+        x = cs.MX.sym('X', self.x_dim, self.horizon)
+        u = cs.MX.sym('U', self.u_dim, self.horizon)
+
+        J = cs.sum2(cs.sum1(cs.MX(np.diag(Q))*(x*x)) + cs.sum1(cs.MX(np.diag(R))*(u*u)))
+        L = cs.Function('loss_fn', [x,u], [J])
+        return L #return loss function
+    def prop_network(self, x, u):
+
+        #stack x,u
+        inp_net = cs.vertcat(x, u)
+        out = self.network(inp_net.T)
+
+        #(6,N)
+        return out.T
+    
+    def fn_dynamic_constr(self, x0, x, u):
+        xs = cs.horzcat(x0,x[:,:-1]) # (x0.... xn-1)
+
+        dyn_x = self.prop_network(xs,u) # predicted (x1... xn)
+
+        # xk+1 = f(xk,uk)
+        # returns f(xk,uk)-xk+1 = 0 flattened 
+        return (x - dyn_x).reshape((-1,1))
+    
+    def fn_decision_constr(self, x, u):
+        #setup decision variable limits
+        m,n = x.shape
+        ubx = cs.MX(np.ones(m*n)*np.inf)
+        lbx = cs.MX(np.ones(m*n)*-np.inf)
+        m,n = u.shape
+        ubu = cs.MX(np.ones(m*n)*0.1)
+        lbu = cs.MX(np.ones(m*n)*-0.1)
+
+        ub_d = cs.vertcat(ubx,ubu)
+        lb_d = cs.vertcat(lbx,lbu)
+        return ub_d, lb_d
 
     def extract_solution(self,sol):
         solution  = np.array(sol)
@@ -66,21 +101,45 @@ class NN_MPC:
         u = us.reshape((3,-1))
         return x,u
     def optimize(self, state):
-        u = cs.SX.sym('u',self.u_dim,self.horizon)
-        x = cs.SX.sym('x',self.x_dim,self.horizon)
-        # x0 = cs.SX(state)
-        L = self.fn_objective(x,u,self.Q,self.R)
+        u = cs.MX.sym('u',self.u_dim,self.horizon)
+        x = cs.MX.sym('x',self.x_dim,self.horizon)
+        x0 = cs.MX(state)
 
         #setup optimization problem (objective + constraints) + solver
+        '''
+            NOTE: General Structure of nlpsol
 
-        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))
-        nlp = cs.nlpsol('nlp','ipopt', {'x': opt_x, 'g': })
+            min f(x)
+            s.t. lbg <= g(x) <= ubg
+                 lbx <=   x  <= ubx
 
+
+            for our purposes, we should do some work on our end to prevent
+            extra complications modifying lbg and ubg. Normally, these params
+            are meant for how far we can adjust our decision variables.
+
+            for equality constraints like:
+                xk+1 = A*xk + B*uk
+            lets leave it as
+                0 = A*xk + B*uk - xk+1
+
+            so we can let: lb, ub = 0
+        '''
+        L = self.fn_objective(self.Q,self.R)
+        dyn_x  = self.fn_dynamic_constr(x0,x,u)
+        lbg    = cs.SX(np.zeros(dyn_x.shape[0]))
+        ubg    = cs.SX(np.zeros(dyn_x.shape[0]))
+        ubx,lbx = self.fn_decision_constr(x,u)
+
+
+        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))    
+        solver = cs.nlpsol('solver','ipopt', {'f': L(x,u), 'x': opt_x, 'g': dyn_x})
+
+        initial_guess = cs.SX(np.zeros(opt_x.shape[0]))
         #solve
-        solution = nlp()
+        solution = solver(x0=initial_guess, lbx=lbx,ubx=ubx,lbg=lbg,ubg=ubg)
         x,u = self.extract_solution(solution['x'])
         return x,u
-
 
 
 
