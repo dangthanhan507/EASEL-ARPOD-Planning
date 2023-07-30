@@ -37,6 +37,9 @@ NOTES:
     MX is matrix expression (not limited)
 
     neural networks only use MX so we stuck with that :(
+    
+    TODO:
+        make it so that I can swap out the dynamic constraints easily
 '''
 class NN_MPC:
     #MPC using neural network as complete replacement for dynamics
@@ -81,14 +84,14 @@ class NN_MPC:
     def fn_decision_constr(self, x, u):
         #setup decision variable limits
         m,n = x.shape
-        ubx = cs.MX(np.ones(m*n)*np.inf)
-        lbx = cs.MX(np.ones(m*n)*-np.inf)
+        ubx = (np.ones(m*n)*np.inf).tolist()
+        lbx = (np.ones(m*n)*-np.inf).tolist()
         m,n = u.shape
-        ubu = cs.MX(np.ones(m*n)*0.1)
-        lbu = cs.MX(np.ones(m*n)*-0.1)
+        ubu = (np.ones(m*n)*0.1).tolist()
+        lbu = (np.ones(m*n)*-0.1).tolist()
 
-        ub_d = cs.vertcat(ubx,ubu)
-        lb_d = cs.vertcat(lbx,lbu)
+        ub_d = ubx + ubu
+        lb_d = lbx + lbu
         return ub_d, lb_d
 
     def extract_solution(self,sol):
@@ -127,17 +130,20 @@ class NN_MPC:
         '''
         L = self.fn_objective(self.Q,self.R)
         dyn_x  = self.fn_dynamic_constr(x0,x,u)
-        lbg    = cs.SX(np.zeros(dyn_x.shape[0]))
-        ubg    = cs.SX(np.zeros(dyn_x.shape[0]))
+        # lbg    = cs.MX(np.zeros(dyn_x.shape[0]))
+        # ubg    = cs.MX(np.zeros(dyn_x.shape[0]))
         ubx,lbx = self.fn_decision_constr(x,u)
-
-
         opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))    
-        solver = cs.nlpsol('solver','ipopt', {'f': L(x,u), 'x': opt_x, 'g': dyn_x})
 
-        initial_guess = cs.SX(np.zeros(opt_x.shape[0]))
+        options = {'ipopt.print_level': 1}
+        solver = cs.nlpsol('solver','ipopt', {'f': L(x,u), 'x': opt_x, 'g': dyn_x}, options)
+        print(solver)
+
+        initial_guess = cs.MX(np.zeros(opt_x.shape[0]))
         #solve
-        solution = solver(x0=initial_guess, lbx=lbx,ubx=ubx,lbg=lbg,ubg=ubg)
+        solution = solver(lbx=lbx,ubx=ubx,lbg=0,ubg=0)
+        
+        print(solution['x'])
         x,u = self.extract_solution(solution['x'])
         return x,u
 
