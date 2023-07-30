@@ -37,9 +37,6 @@ NOTES:
     MX is matrix expression (not limited)
 
     neural networks only use MX so we stuck with that :(
-    
-    TODO:
-        make it so that I can swap out the dynamic constraints easily
 '''
 class NN_MPC:
     #MPC using neural network as complete replacement for dynamics
@@ -68,15 +65,22 @@ class NN_MPC:
     def prop_network(self, x, u):
 
         #stack x,u
-        inp_net = cs.vertcat(x, u)
-        print(inp_net.shape)
-        out = self.network(inp_net.T)
+        
+        outs = []
+        for i in range(x.shape[1]):
+            out = self.network(cs.vertcat(x[:,i],u[:,i]))
+            outs.append(out)
+        outs = cs.horzcat(*outs)
+        out = outs
 
+        # inp_net = cs.vertcat(x, u)
+        # out = self.network(inp_net.T).T
+        
         #(6,N)
-        return out.T
+        return out
     
 
-    def fn_normal_dynamics(self, x0, x, u):
+    def fn_hcw_constr(self, x0, x, u):
         xs = cs.horzcat(x0,x[:,:-1]) # (x0.... xn-1)
         A,B = createHCWDiscreteMatrices(1,1000,100)
         dyn_x = A@xs + B@u
@@ -139,24 +143,21 @@ class NN_MPC:
 
             so we can let: lb, ub = 0
         '''
-        L = self.fn_objective(self.Q,self.R)
-        dyn_x  = self.fn_normal_dynamics(x0,x,u)
-        # lbg    = cs.MX(np.zeros(dyn_x.shape[0]))
-        # ubg    = cs.MX(np.zeros(dyn_x.shape[0]))
+        L       = self.fn_objective(self.Q,self.R)
+        dyn_x   = self.fn_dynamic_constr(x0,x,u)
         ubx,lbx = self.fn_decision_constr(x,u)
-        opt_x  = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))
+        opt_x   = cs.vertcat(x.reshape((-1,1)),u.reshape((-1,1)))
 
 
         #NOTE: ipopt struggles with neural network
-        #      qpsol is good since neural network has no activation function
+        #      qpsol is good since neural network has no activation function (becomes linear -> linear constraint)
         #      use sqpmethod if neural network uses nonlinear functions inside of it
-        options = {}
+        options = {'printLevel': "none"}
         solver = cs.qpsol('solver','qpoases', {'f': L(x,u), 'x': opt_x, 'g': dyn_x}, options)
 
         initial_guess = np.zeros(opt_x.shape[0]).tolist()
         #solve
         solution = solver(x0=initial_guess, lbx=lbx,ubx=ubx,lbg=0,ubg=0)
-        print(solution['g'])
         x,u = self.extract_solution(solution['x'])
 
         return x,u

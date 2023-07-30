@@ -42,4 +42,4 @@ class SimpleDynamicsNetwork(nn.Module):
     def forward(self, inp):
         '''
         '''
-        return self.model(inp)
+        return self.model(inp.T).T

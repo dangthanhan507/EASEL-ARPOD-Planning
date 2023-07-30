@@ -12,6 +12,12 @@ import numpy as np
         https://arxiv.org/pdf/1803.11347.pdf
         https://github.com/iclavera/learning_to_adapt/tree/master
 
+
+        RESEARCH IDEAS:
+            -> neural network for ODE
+            -> neural network for ODE integration (what I have rn)
+            -> neural network mixed w/ real dynamics
+
 '''
 def createHCWDiscreteMatrices(T, mu_GM, R):
     '''

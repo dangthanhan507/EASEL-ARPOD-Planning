@@ -44,13 +44,13 @@ def runRandomHCW(Ak, Bk, pos_limits = (-10,10), vel_limits= (-1,1), n_samples=1e
     x1 = Ak@x + Bk@u #6xN
     return np.vstack((x,u)).T, x1.T
 
-def createHCWDatapoints(mu_GM, R, tstep, n_datapoints=1e6, pos_limits = (-10,10), vel_limits = (-1,1)):
+def createHCWDatapoints(mu_GM, R, tstep, n_datapoints=1e6, pos_limits = (-10,10), vel_limits = (-10,10)):
     Ak,Bk = createHCWDiscreteMatrices(tstep, mu_GM, R)
     datas,labels = runRandomHCW(Ak,Bk,pos_limits,vel_limits,n_samples=n_datapoints)
     return datas, labels
 
 
-def createArpodDatapoints(mu_GM, R, tstep,n_simulations=1000, pos_limits = (-10,10), vel_limits = (-1,1)):
+def createArpodDatapoints(mu_GM, R, tstep,n_simulations=1000, pos_limits = (-10,10), vel_limits = (-10,10)):
     '''
         Description:
         ------------
@@ -103,7 +103,7 @@ def save_data(datas, labels):
     torch.save(labels,'./dataset/hcw_labels.pt')
 
 if __name__ == '__main__':
-    load_data = True
+    load_data = False
     
     if not load_data:
         mu_GM = 1000

@@ -28,8 +28,8 @@ if __name__ == '__main__':
 
     dataloader = DataLoader(train_dataset,shuffle=True,num_workers=4,batch_size=BATCH_SIZE,pin_memory=False)
 
-    adam = torch.optim.Adam(network.parameters(),lr=1e-3)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(adam, [10]*2 + [5]*2, gamma=0.5)
+    adam = torch.optim.Adam(network.parameters(),lr=1e-2)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(adam, [20]*1, gamma=0.1)
     loss = nn.MSELoss(reduction='mean')
 
 
