@@ -111,8 +111,8 @@ class NN_MPC:
 
         xs = solution[0:final_x_idx]
         us = solution[final_x_idx:]
-        x = xs.reshape((6,-1))
-        u = us.reshape((3,-1))
+        x = xs.reshape((-1,6)).T
+        u = us.reshape((-1,3)).T
         return x,u
     def optimize(self, state):
         u = cs.MX.sym('u',self.u_dim,self.horizon)
@@ -140,7 +140,7 @@ class NN_MPC:
             so we can let: lb, ub = 0
         '''
         L = self.fn_objective(self.Q,self.R)
-        dyn_x  = self.fn_dynamic_constr(x0,x,u)
+        dyn_x  = self.fn_normal_dynamics(x0,x,u)
         # lbg    = cs.MX(np.zeros(dyn_x.shape[0]))
         # ubg    = cs.MX(np.zeros(dyn_x.shape[0]))
         ubx,lbx = self.fn_decision_constr(x,u)
@@ -159,16 +159,6 @@ class NN_MPC:
         print(solution['g'])
         x,u = self.extract_solution(solution['x'])
 
-        #TEST: should be deleted after.
-        xk = np.hstack((state,x[:,:-1]))
-        xk1 = x
-        import torch
-        inp = torch.Tensor(np.vstack((xk,u))).T
-        out = self.net_net(inp).T
-        print(out.numpy()[:,0])
-        print(xk1[:,0])
-
-        input()
         return x,u
 
 
