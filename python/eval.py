@@ -1,34 +1,40 @@
 import torch
-from arpod_dynamics import createHCWDiscreteMatrices
-from networks import SimpleDynamicsNetwork
-from controller import NN_MPC
-import numpy as np
+from torch.autograd import Variable
+from mpc import mpc
+from mpc.mpc import QuadCost, LinDx
+
+
 if __name__ == '__main__':
+    torch.manual_seed(0)
 
-    device = 'cpu'
-    network = SimpleDynamicsNetwork()
-    network_load = torch.load('./models/hcw_simple_model.pt').to(device)
-    network.load_state_dict(network_load.state_dict())
-    A,B = createHCWDiscreteMatrices(1,1000,100)
+    n_batch, n_state, n_ctrl, T = 2, 3, 4, 5
+    n_sc = n_state + n_ctrl
 
-    Q = np.eye(6)*100
-    R = np.eye(3)
+    # Randomly initialize a PSD quadratic cost and linear dynamics.
+    C = torch.randn(T*n_batch, n_sc, n_sc)
+    C = torch.bmm(C, C.transpose(1, 2)).view(T, n_batch, n_sc, n_sc)
+    c = torch.randn(T, n_batch, n_sc)
 
-    pos0 = np.ones(3)*-5
-    vel0 = np.ones(3)*0.1
-    x0 = np.array([pos0,vel0]).reshape((6,1))
-    mpc = NN_MPC(1,Q,R,horizon=5,network=network)
-    
-    t = 0
-    finalT = 100
-    while t < finalT:
-        xs,us = mpc.optimize(x0)
-        u = us[:,0].reshape((3,1))
-        x0 = A@x0 + B@u
+    alpha = 0.2
+    R = (torch.eye(n_state)+alpha*torch.randn(n_state, n_state)).repeat(T, n_batch, 1, 1)
+    S = torch.randn(T, n_batch, n_state, n_ctrl)
+    F = torch.cat((R, S), dim=3)
 
-        t += 1
+    # The initial state.
+    x_init = torch.randn(n_batch, n_state)
 
-    print(x0)
-    
+    # The upper and lower control bounds.
+    u_lower = -torch.rand(T, n_batch, n_ctrl)
+    u_upper = torch.rand(T, n_batch, n_ctrl)
 
-    
+    x_lqr, u_lqr, objs_lqr = mpc.MPC(
+        n_state=n_state,
+        n_ctrl=n_ctrl,
+        T=T,
+        u_lower=u_lower, 
+        u_upper=u_upper,
+        lqr_iter=20,
+        verbose=1,
+        backprop=False,
+        exit_unconverged=False,
+    )(x_init, QuadCost(C, c), LinDx(F))
