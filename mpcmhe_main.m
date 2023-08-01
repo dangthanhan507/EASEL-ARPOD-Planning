@@ -13,9 +13,9 @@ clc
 rng(1);
 
 
-use2D = true;
+use2D = false;
 useNonlinear = true;
-useAttitude = false;
+useAttitude = true;
 mpc_horizon = 30;
 mhe_horizon = 10;
 total_time = 100; %total time in seconds
@@ -27,9 +27,11 @@ benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, t
 %{
     The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
 %}
-noiseQ = @() [0;0;0;0];
-noiseR = @() [0;0;0;0];
-traj0 = [1;1;0.001;0.001];
+noiseQ = @() [0;0;0;0;0;0];
+noiseR = @() [0;0;0;0;0;0];
+% traj0 = [1;1;0.001;0.001];
+
+traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
 benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR);
 
 delete("tmpC*") %delete any temporary files created

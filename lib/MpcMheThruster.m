@@ -35,10 +35,21 @@ classdef MpcMheThruster
         window_mpcstates   %decision variable in optimiation
 
 
+        window_mheattcontrols
+        window_attmeasurements
+        window_mheattstates
+        window_attmeasError
+
+        window_mpcattcontrols
+        window_mpcattstates
+
+
         % pertinent information regarding algorithm
         x0 %this is a variable we set to not change during optimization of mpc-mhe
         backwardT
         forwardT
+
+        att0
 
         % tens calc optimizer
         opt
@@ -150,12 +161,13 @@ classdef MpcMheThruster
             [dim,n] = size(att0);
             Tvariable att0a    [dim,1];
             Tvariable att      [dim, obj.backwardT + obj.forwardT];
-            Tvariable attuback [attcontrol_dim, backwardT];
-            Tvariable attvback [dim, backwardT];
-            Tvariable attu     [attcontrol_dim, forwardT];
-            Tvariable attypast [dim, backwardT];
+            Tvariable attuback [attcontrol_dim, obj.backwardT];
+            Tvariable attvback [dim, obj.backwardT];
+            Tvariable attu     [attcontrol_dim, obj.forwardT];
+            Tvariable attypast [dim, obj.backwardT];
 
 
+            obj.att0 = att0;
             obj.Tatt0 = att0a;
             obj.Tatt =  att;
             obj.Tattuback = attuback;
@@ -198,6 +210,13 @@ classdef MpcMheThruster
 
             %return
             xDynamics = (obj.Tx == obj.Ak*xk + obj.Bk*(u+obj.Td));
+        end
+
+        function xDynamics = setupAttDynamicConstraints(obj)
+            xk = [obj.Tatt0, obj.Tatt(:,1:end-1)];
+            u = [obj.Tattuback, obj.Tattuforward];
+
+            xDynamics = (obj.Tatt == obj.Aatt*xk + obj.Batt*u);
         end
 
         %QUESTION: Will we want to use an MPC-MHE which moves its measurement constraints up into the 
@@ -243,6 +262,14 @@ classdef MpcMheThruster
             C = eye(dim); % measurement function
 
             yConstr = (obj.Tyback == C*xk + obj.Tvback);
+        end
+        function yConstr = setupAttSensorConstr(obj)
+            xk = obj.Tatt(:,1:obj.backwardT);
+            [dim,n] = size(obj.att0);
+
+            C = eye(dim); % measurement function
+
+            yConstr = (obj.Tattyback == C*xk + obj.Tattvback);
         end
         %setting up objective
         function J = objectiveF(obj)
@@ -327,6 +354,26 @@ classdef MpcMheThruster
             outputExpressionsCell = {J,obj.Tuforward,obj.Td,obj.Tx0,obj.Tx, obj.Tvback};
             parametersCell = {obj.Tuback,obj.Tyback};
 
+            if obj.use_attitude
+                attYConstr = obj.setupAttSensorConstr();
+                attXDynamics = obj.setupAttDynamicConstraints();
+                
+                P1optimizationVariablesCell = [P1optimizationVariablesCell, {obj.Tattuforward}];
+                P2optimizationVariablesCell = [P2optimizationVariablesCell, {obj.Tattvback, obj.Tatt0}];
+                latentVariablesCell = [latentVariablesCell, {obj.Tatt}];
+                P1constraintsCell = [P1constraintsCell, {obj.Tattuforward<=uMax*Tones(size(obj.Tattuforward)),...
+                                                        obj.Tattuforward>=-uMax*Tones(size(obj.Tattuforward))}];
+
+                P2constraintsCellAtt = {obj.Tattvback <= vMax*Tones(size(obj.Tattvback)),...
+                                        obj.Tattvback >= -vMax*Tones(size(obj.Tattvback)),...
+                                        attYConstr};
+                P2constraintsCell = [P2constraintsCell, P2constraintsCellAtt];
+
+                latentConstraintsCell = [latentConstraintsCell, {attXDynamics}];
+
+                outputExpressionsCell = [outputExpressionsCell, {obj.Tattuforward, obj.Tatt0, obj.Tatt, obj.Tattvback}];
+                parametersCell = [parametersCell, {obj.Tattuback, obj.Tattyback}    ];
+            end
 
             classname=obj.version(...
                 'classname','tmpC_target_chaser_main',...
@@ -395,7 +442,24 @@ classdef MpcMheThruster
             %setup mpc windows
             obj.window_mpccontrols = zeros(control_dim, obj.forwardT);
             obj.window_mpcstates = zeros(state_dim, obj.forwardT);
- 
+        end
+        function obj = setupAttWindows(obj, window_states, window_measurements, window_controls)
+            [control_dim, n] = size(window_controls);
+            [state_dim, n] = size(window_states);
+            [meas_dim, n] = size(window_measurements);
+
+
+
+
+            obj.window_mheattcontrols = window_controls;
+            obj.window_attmeasurements = window_measurements;
+            obj.window_mheattstates = window_states;
+            obj.window_attmeasError = zeros(meas_dim, obj.backwardT);
+
+
+            %setup mpc windows
+            obj.window_mpcattcontrols = zeros(control_dim, obj.forwardT);
+            obj.window_mpcattstates = zeros(state_dim, obj.forwardT);
         end
         function obj = shiftWindows(obj, measurement, control)
             %{
@@ -482,13 +546,34 @@ classdef MpcMheThruster
             setV_x(obj.opt, [obj.window_mhestates, obj.window_mpcstates]);
             setV_vback(obj.opt, obj.window_measError);
 
+            if obj.use_attitude
+                setP_attuback(obj.opt, obj.window_mheattcontrols);
+                setP_attypast(obj.opt, obj.window_attmeasurements);
+                
+                setV_attu(obj.opt, obj.window_mpcattcontrols);
+                setV_att0a(obj.opt, obj.att0);
+                setV_att(obj.opt, [obj.window_mheattstates, obj.window_mpcattstates]);
+                setV_attvback(obj.opt, obj.window_attmeasError);
+            end
+
             mu0 = 1;
             maxIter = 100;
             saveIter = -1;
 
             %TODO: parse the status, iter, and time for anything useful to know (throw errors if necessary)
             [status, iter, time] = solve(obj.opt, mu0, int32(maxIter), int32(saveIter));
-            [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(obj.opt); %get results
+
+            if obj.use_attitude
+                [Jcost, mpcUs, mheDs, x0s, xs, vs, mpcAttUs, att0s, attXs, mheAttVs] = getOutputs(obj.opt);
+
+                obj.window_mpcattcontrols = mpcAttUs;
+                obj.window_mheattstates   = attXs(:,1:obj.backwardT);
+                obj.window_mpcattstates   = attXs(:,obj.backwardT+1:end);
+                obj.window_attmeasError   = mheAttVs;
+            else
+                [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(obj.opt); %get results
+            end
+            
 
             mheXs = xs(:,1:obj.backwardT);
             mpcXs = xs(:,obj.backwardT+1:end);
@@ -538,6 +623,12 @@ classdef MpcMheThruster
             mpcXs = obj.window_mpcstates;
             mpcUs = obj.window_mpccontrols;
         end
+        function [mheXs, mheVs, mpcXs, mpcUs] = getOptimizeResultAttitude(obj)
+            mheXs = obj.window_mheattstates;
+            mheVs = obj.window_attmeasError;
+            mpcXs = obj.window_mpcattstates;
+            mpcUs = obj.window_mpcattcontrols;
+        end
         function u = getMPCControl(obj)
             %{
                 Description:
@@ -556,11 +647,17 @@ classdef MpcMheThruster
             %}
             u = obj.window_mpccontrols(:,1);
         end
+        function u = getMPCAttControl(obj)
+            u = obj.window_mpcattcontrols(:,1);
+        end
         function x = getMHEState(obj)
             %{
                 TODO: Add Docstring
             %}
             x = obj.window_mhestates(:,end);
+        end
+        function x = getMHEAttState(obj)
+            x = obj.window_mheattstates(:,end);
         end
         %{
             TODO: implement a runController(meas,control) that outputs current estimated state and controls

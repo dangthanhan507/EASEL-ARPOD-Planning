@@ -87,7 +87,7 @@ classdef ARPOD_Mission
             obj.dynamics = obj.dynamics.initDynamics(traj, is2D, thruster_type);
         end
         function obj = useAttitude(obj, att)
-            obj.dynamics.initAttitude(att)
+            obj.dynamics = obj.dynamics.initAttitude(att);
         end
         function obj = nextStep(obj, control, system_noise, sensor_noise, useFullSense)
             obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise);

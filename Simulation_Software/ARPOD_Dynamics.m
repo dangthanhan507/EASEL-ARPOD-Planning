@@ -162,7 +162,7 @@ classdef ARPOD_Dynamics
             traj = transpose(trajs(length(trajs),:));
         end
         function traj = attitudeSolver(traj0, u, tstep, is2D)
-            motion = @(t,traj) ARPOD_Dynamics.attitudeMotion(t,traj,u,is2D)
+            motion = @(t,traj) ARPOD_Dynamics.attitudeMotion(t,traj,u,is2D);
             [ts,trajs] = ode45(motion, 0:tstep, traj0);
             traj = transpose(trajs(length(trajs),:));
         end
@@ -205,7 +205,6 @@ classdef ARPOD_Dynamics
             obj.use_attitude = true;
         end
         function obj = nextStep(obj, control_input, tstep, R, mu_GM, noise_model)
-
             %{
                 Thruster Types:
                     Discrete-Time
@@ -222,7 +221,6 @@ classdef ARPOD_Dynamics
             obj.traj = ARPOD_Dynamics.nonlinearMotionSolver(obj.traj, R, mu_GM, ut, tstep, obj.is2D) + noise_model();
         end
         function obj = nextAttitudeStep(obj, control_input, tstep, noise_model)
-
             ut = @(t) control_input;
             obj.att_traj = ARPOD_Dynamics.attitudeSolver(obj.att_traj, ut, tstep, obj.is2D) + noise_model();
         end
