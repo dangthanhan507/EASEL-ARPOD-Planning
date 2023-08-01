@@ -516,6 +516,27 @@ classdef MpcMheThruster
             %push new measurement into mhe measurements
             obj.window_measurements = [obj.window_measurements(:,2:end), measurement];
         end
+        function obj = shiftAttitudeWindows(obj, measurement, control)
+            obj.att0 = obj.window_mheattstates(:,1);
+
+            %shift and use obj.window_mpcstates as a "predicted variable" for warm-start
+            obj.window_mheattstates = [obj.window_mheattstates(:,2:end), obj.window_mpcattstates(:,1)];
+            %propagate zero control input thrust as warm-start for last element
+            obj.window_mpcattstates = [obj.window_mpcattstates(:,2:end), obj.Aatt*obj.window_mpcattstates(:,end)];
+
+            %assume no measError on last element for warm-start
+            [dim,n] = size(obj.window_attmeasError);
+            obj.window_attmeasError = [obj.window_attmeasError(:,2:end), zeros(dim,1)];
+
+            %push mhecontrols with new control input
+            %assume no new thrust at tail end of mpc
+            [dim,n] = size(obj.window_mpcattcontrols);
+            obj.window_mheattcontrols = [obj.window_mheattcontrols(:,2:end), control];
+            obj.window_mpcattcontrols = [obj.window_mpcattcontrols(:,2:end), zeros(dim,1)];
+
+            %push new measurement into mhe measurements
+            obj.window_attmeasurements = [obj.window_attmeasurements(:,2:end), measurement];
+        end
         function obj = optimize(obj)
             %{
                 Description:

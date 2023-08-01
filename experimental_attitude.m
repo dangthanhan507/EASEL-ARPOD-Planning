@@ -41,9 +41,17 @@
 %}
 
 att = [1;1;1;0;0;0];
+tstep = 1;
 
-[A,B] = ARPOD_Dynamics.linearHCWDynamics(obj.tstep, Mission.mu, Mission.a, obj.use_2d);
-[Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(obj.tstep, obj.is2D);
+u = @(t) [20;20;-10];
+
+att1 = ARPOD_Dynamics.attitudeSolver(att, u, tstep, false);
+
+[Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, false);
+att1_pred = Aatt*att + Batt*u(0);
+
+disp(att1);
+disp(att1_pred);
 
 
 % MOVING EVERYTHING INTO THRUSTER BENCHMARK

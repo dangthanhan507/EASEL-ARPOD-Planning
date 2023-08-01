@@ -225,11 +225,14 @@ classdef ThrusterBenchmark
             obj.est_att_trajs   = zeros(attstate_dim, num_steps);
             obj.att_controls    = zeros(attcontrol_dim, num_steps);
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
-                Mission = Mission.nextStep(u,noiseQ,noiseR,true);
-
                 idx = (i - obj.mhe_horizon)/obj.tstep;
+
+                Mission = Mission.nextStep(u,noiseQ,noiseR,true);
                 if obj.use_attitude
-                    Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);                    
+                    Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
+
+                    att_meas = Mission.att_sensor;
+                    mpcmhe = mpcmhe.shiftAttitudeWindows(att_meas,uatt);
                 end
                 true_traj = Mission.traj;
                 meas = Mission.sensor;
@@ -239,7 +242,7 @@ classdef ThrusterBenchmark
                 u = mpcmhe.getMPCControl();
                 est_traj = mpcmhe.getMHEState();
 
-                if obj.use_attitude
+                if obj.use_attitude                    
                     uatt = mpcmhe.getMPCAttControl();
                     est_att_traj = mpcmhe.getMHEAttState();
 
