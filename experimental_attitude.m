@@ -34,6 +34,16 @@
     when thruster misalignment happens, we induce a change in the rotation matrix
 %}
 
+%{
+    After Copp Discussion:
+    ======================
+        -> just add attitude with zero effects except for actuators
+%}
+
+att = [1;1;1;0;0;0];
+
+[A,B] = ARPOD_Dynamics.linearHCWDynamics(obj.tstep, Mission.mu, Mission.a, obj.use_2d);
+[Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(obj.tstep, obj.is2D);
 
 
-disp("Hello World\n")
+% MOVING EVERYTHING INTO THRUSTER BENCHMARK

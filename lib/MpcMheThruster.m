@@ -19,8 +19,10 @@ classdef MpcMheThruster
         codeType
         compilerFlags
 
-        % window of stuff to consider
+        %boolean
+        use_attitude = false; % do we use attitude
 
+        % window of stuff to consider
         %mhe windows
         window_mhecontrols %parameter in the estimation
         window_measurements%parameter in the estimation
@@ -49,6 +51,19 @@ classdef MpcMheThruster
         Tyback
         Tvback
         Tuforward
+
+        %Tenscalc varibales for attitude
+        Tatt0
+        Tatt
+        Tattuback
+        Tattuforward
+        Tattvback
+        Tattyback
+
+
+        %discrete matrices for attitude
+        Aatt
+        Batt
 
         Ak % invariant discrete dynamics matrix for state
         Bk % invariant discrete dynamics matrix for control input
@@ -125,7 +140,33 @@ classdef MpcMheThruster
             obj.Ak = A;
             obj.Bk = B;
 
-            obj = obj.setupOptimize(0.01, 0.01, 0.1, 200);
+        end
+        function obj = initAtt(obj, att0, Aatt, Batt, attcontrol_dim)
+
+
+            %{
+                TensCalc variables for attitude
+            %}
+            [dim,n] = size(att0);
+            Tvariable att0a    [dim,1];
+            Tvariable att      [dim, obj.backwardT + obj.forwardT];
+            Tvariable attuback [attcontrol_dim, backwardT];
+            Tvariable attvback [dim, backwardT];
+            Tvariable attu     [attcontrol_dim, forwardT];
+            Tvariable attypast [dim, backwardT];
+
+
+            obj.Tatt0 = att0a;
+            obj.Tatt =  att;
+            obj.Tattuback = attuback;
+            obj.Tattuforward = attu;
+            obj.Tattvback = attvback;
+            obj.Tattyback = attypast;
+
+            obj.Aatt = Aatt;
+            obj.Batt = Batt;
+
+            obj.use_attitude = true;
         end
 
         %QUESTION: will we need to use nonlinear version (RK-4)?
@@ -228,6 +269,11 @@ classdef MpcMheThruster
             J = J + 10*norm2(obj.Tuforward);
             J = J - 10*norm2(obj.Td) - 100*norm2(obj.Tvback);
         end
+        function Jatt = objectiveAtt(obj)
+            Jatt = 10*norm2(obj.Tatt(:,obj.backwardT+1:obj.forwardT));
+            Jatt = Jatt + 10*norm2(obj.Tattuforward);
+            Jatt = Jatt - 100*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
+        end
         function obj = setupOptimize(obj, vMax, dMax, uMax, maxIter)
             %{
                 Description:
@@ -252,6 +298,10 @@ classdef MpcMheThruster
             %}
             J = obj.objectiveF();
 
+            if obj.use_attitude
+                J = J + obj.objectiveAtt();
+            end
+
             xDynamics = obj.setupDynamicConstraints();
             yConstr = obj.setupSensorConstr();
 
@@ -260,23 +310,36 @@ classdef MpcMheThruster
             %{
                 creating optimization problem for MPC-MHE
             %}
+
+            P1optimizationVariablesCell = {obj.Tuforward};
+            P2optimizationVariablesCell = {obj.Td, obj.Tvback, obj.Tx0};
+            latentVariablesCell = {obj.Tx};
+            P1constraintsCell = {obj.Tuforward<=uMax*Tones(size(obj.Tuforward)),...
+                                 obj.Tuforward>=-uMax*Tones(size(obj.Tuforward))};
+                                 
+            P2constraintsCell = {obj.Td<=dMax*Tones(size(obj.Td)),...
+                                obj.Td>=-dMax*Tones(size(obj.Td)),...
+                                obj.Tvback <= vMax*Tones(size(obj.Tvback)),...
+                                obj.Tvback >= -vMax*Tones(size(obj.Tvback)),...
+                                yConstr};
+            latentConstraintsCell = {xDynamics};
+
+            outputExpressionsCell = {J,obj.Tuforward,obj.Td,obj.Tx0,obj.Tx, obj.Tvback};
+            parametersCell = {obj.Tuback,obj.Tyback};
+
+
             classname=obj.version(...
                 'classname','tmpC_target_chaser_main',...
                 'P1objective',J,...
                 'P2objective',-J,...
-                'P1optimizationVariables',{obj.Tuforward},...
-                'P2optimizationVariables',{obj.Td, obj.Tvback, obj.Tx0},...
-                'latentVariables',{obj.Tx},...
-                'P1constraints',{obj.Tuforward<=uMax*Tones(size(obj.Tuforward)),...
-                                 obj.Tuforward>=-uMax*Tones(size(obj.Tuforward))},...
-                'P2constraints',{obj.Td<=dMax*Tones(size(obj.Td)),...
-                                 obj.Td>=-dMax*Tones(size(obj.Td)),...
-                                 obj.Tvback <= vMax*Tones(size(obj.Tvback)),...
-                                 obj.Tvback >= -vMax*Tones(size(obj.Tvback)),...
-                                 yConstr},...
-                'latentConstraints',{xDynamics},...
-                'outputExpressions',{J,obj.Tuforward,obj.Td,obj.Tx0,obj.Tx, obj.Tvback},...
-                'parameters',{obj.Tuback,obj.Tyback},...
+                'P1optimizationVariables',P1optimizationVariablesCell,...
+                'P2optimizationVariables',P2optimizationVariablesCell,...
+                'latentVariables',latentVariablesCell,...
+                'P1constraints',P1constraintsCell,...
+                'P2constraints',P2constraintsCell,...
+                'latentConstraints',latentConstraintsCell,...
+                'outputExpressions',outputExpressionsCell,...
+                'parameters',parametersCell,...
                 'muFactorAggressive',.5,...
                 'muFactorConservative',.99,...
                 'desiredDualityGap',0.1,...

@@ -77,6 +77,24 @@ classdef ThrusterBenchmark
             obj.mpc_horizon = mpc_horizon;
 
         end
+        function [posTraj, attTraj] = decomposeTraj(obj, traj)
+            if obj.use_attitude
+                if obj.use_2d
+                    % [x,y,yaw]
+                    % 1->2 pos, 3 att, 4->5 posdot, 6 attdot
+                    posTraj = [traj(1:2,:);traj(4:5,:)];
+                    attTraj = [traj(3,:);traj(6,:)];
+                else
+                    % [x,y,z,roll,pitch,yaw]
+                    % 1->3 pos, 4->6 att, 7->9 posdot, 10->12 attdot
+                    posTraj = [traj(1:3,:);traj(7:9,:)];
+                    attTraj = [traj(4:6,:);traj(10:12,:)];
+                end
+            else
+                posTraj = traj;
+                attTraj = nargin;
+            end
+        end
         function obj = runBenchmark(obj, traj0, noiseQ, noiseR)
             %{
                 TODO: fill this docstring
@@ -94,14 +112,20 @@ classdef ThrusterBenchmark
                 Returns:
                 --------
 
+                NOTES:
+                ---------
+                traj0 should contain both position and attitude and velocity of both too
             %}
 
-            if obj.use_2d
-                [dim,n] = size(traj0);
-                if dim ~= 4
-                    error("Non 2D Trajectory used");
-                end
-            end
+
+            % TODO: make this check work with attitude
+            % if obj.use_2d
+            %     [dim,n] = size(traj0);
+            %     if dim ~= 4
+            %         error("Non 2D Trajectory used");
+            %     end
+            % end
+            [traj0,att0] = obj.decomposeTraj(traj0);
 
             %MISSION SETUP
             %=====================
@@ -109,6 +133,7 @@ classdef ThrusterBenchmark
             Mission = ARPOD_Mission;
             Mission = Mission.initMission(traj0, obj.tstep, obj.use_2d, 1);
             [A,B] = ARPOD_Dynamics.linearHCWDynamics(obj.tstep, Mission.mu, Mission.a, obj.use_2d);
+            [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(obj.tstep, obj.is2D);
             %=====================
 
             
@@ -116,23 +141,39 @@ classdef ThrusterBenchmark
             %=====================
             %plug in state dim for measurement dim (we assume full state measurements)
             mpcmhe = MpcMheThruster;
+
             if obj.use_2d
                 control_dim = 2;
+                attcontrol_dim = 1;
             else
                 control_dim = 3;
+                attcontrol_dim = 3;
             end
             [state_dim,n] = size(traj0);
             mpcmhe = mpcmhe.init(traj0, obj.mhe_horizon, obj.mpc_horizon, A, B, state_dim, control_dim);
+
+            
+            mpcmhe = mpcmhe.setupOptimize(0.01, 0.01, 0.1, 200);
+
+            if obj.use_attitude
+                mpcmhe = mpcmhe.initAtt(att0, Aatt, Batt, attcontrol_dim);
+            end
+
+            %FINISH INTEGRATING USING THIS IN CONTROL LOOP
+            %
+            
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
             window_measurements = zeros(state_dim,obj.mhe_horizon);
             window_controls = zeros(control_dim,obj.mhe_horizon);
+            window_attcontrols = zeros(attcontrol_dim, obj.mhe_horizon);
             %=====================
 
             %Fill up MPC-MHE windows with measurements
             %==========================================
             u = zeros(control_dim,1);
+            uatt = zeros(attcontrol_dim,1);
             for i = obj.tstep:obj.tstep:obj.mhe_horizon % [tstep -> obj.mhe_horizon] inclusive steps by tstep
                 Mission = Mission.nextStep(u,noiseQ,noiseR,true);
 
@@ -141,10 +182,11 @@ classdef ThrusterBenchmark
                 window_measurements(:,i/obj.tstep) = meas;
                 window_states(:,i/obj.tstep) = true_traj;
                 window_controls(:,i/obj.tstep) = u;
+                window_attcontrols(:,i/obj.tstep) = uatt;
             end
-            mpcmhe = mpcmhe.setupWindows(window_states, window_measurements, window_controls);
+            mpcmhe = mpcmhe.setupWindows(window_states, window_measurements, window_controls, window_attcontrols);
             mpcmhe = mpcmhe.optimize();
-            u = mpcmhe.getMPCControl();
+            [u,uatt] = mpcmhe.getMPCControl();
             %==========================================
 
             %Run MPC-MHE and benchmark now
