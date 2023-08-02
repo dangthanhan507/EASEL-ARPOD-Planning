@@ -208,8 +208,9 @@ classdef ThrusterBenchmark
             mpcmhe = mpcmhe.optimize();
 
             u = mpcmhe.getMPCControl();
-
-            uatt = mpcmhe.getMPCAttControl();
+            if obj.use_attitude
+                uatt = mpcmhe.getMPCAttControl();
+            end
             %==========================================
 
             %Run MPC-MHE and benchmark now
