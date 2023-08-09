@@ -68,7 +68,9 @@ classdef ARPOD_Mission
     properties
         dynamics % using dynamics from ARPOD_Dynamics
         traj % current trajectory of mission
+        att  % current atttide
         sensor % current measurements from sensors
+        att_sensor %current sensed attitude
         phase % current phase of mission
         inLOS % boolean as whether it is in or not
         tstep
@@ -84,6 +86,9 @@ classdef ARPOD_Mission
             obj.dynamics = ARPOD_Dynamics;
             obj.dynamics = obj.dynamics.initDynamics(traj, is2D, thruster_type);
         end
+        function obj = useAttitude(obj, att)
+            obj.dynamics = obj.dynamics.initAttitude(att);
+        end
         function obj = nextStep(obj, control, system_noise, sensor_noise, useFullSense)
             obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise);
             obj.traj = obj.dynamics.currentTraj();
@@ -96,6 +101,11 @@ classdef ARPOD_Mission
                 obj.sensor = ARPOD_Sensor.sense(obj.traj, sensor_noise, obj.phase);
             end
             obj.inLOS = ARPOD_Mission.isInsideLOS(obj.traj);
+        end
+        function obj = nextAttStep(obj, control, system_noise, sensor_noise)
+            obj.dynamics = obj.dynamics.nextAttitudeStep(control, obj.tstep, system_noise);
+            obj.att = obj.dynamics.currentAtt();
+            obj.att_sensor = obj.att + sensor_noise();
         end
     end
 end

@@ -15,7 +15,7 @@ rng(1);
 
 use2D = false;
 useNonlinear = true;
-useAttitude = false;
+useAttitude = true;
 mpc_horizon = 30;
 mhe_horizon = 10;
 total_time = 100; %total time in seconds
@@ -26,11 +26,23 @@ benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, t
 %{
     The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
 %}
+
+% 2d no att
+% noiseQ = @() [0;0;0;0];
+% noiseR = @() [0;0;0;0];
+% traj0 = [1;1;0.001;0.001];
+
+% 3d w/ att
 noiseQ = @() [0;0;0;0;0;0];
 noiseR = @() [0;0;0;0;0;0];
-traj0 = [1;1;-1;0.001;0.001;0.001];
+traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
 
-disturbance = [0.05;0.05;0.05];
+%3d no att
+% noiseQ = @() [0;0;0;0;0;0];
+% noiseR = @() [0;0;0;0;0;0];
+% traj0 = [1;1;1;0;0;0];
+
+disturbance = [0.01;0.01;0.01];
 benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance);
 
 delete("tmpC*") %delete any temporary files created

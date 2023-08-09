@@ -15,14 +15,31 @@ classdef ARPOD_Dynamics
     % gravitational constant in km^2/s^2 from chance-constr MPC
     properties 
         traj
+        att_traj
         is2D %determine whether simulation is 2d or 3d
         thruster_type %determine thruster type in simulation
-
+        use_attitude = false;
 
     end
     methods (Static)
         function [A,B] = linearHCWDynamics(T, mu_GM, R, is2D)
+            %{
+                Description:
+                ------------
+                Create relative orbital dynamics discrete propagation matrices
+                using HCW equations. (A,B)
 
+                Parameters:
+                -----------
+                @params T    : (scalar) time step that A,B propagate by
+                @params mu_GM: (scalar) gravitational constant used in ARPOD
+                @params R    : (scalar) radial distance from spacecraft to earth
+                @params is2D : (bool) whether to use 2d version or not.    
+
+                Returns:
+                --------
+                returns (A,B) matrices to use in xk+1 = A*xk + B*uk
+            %}
             n = sqrt(mu_GM / (R.^3) );
             A = zeros(6,6);
             B = zeros(6,3);
@@ -47,6 +64,78 @@ classdef ARPOD_Dynamics
             if is2D
                 A = [A(1:2,1:2), A(1:2,4:5); A(4:5,1:2), A(4:5,4:5)];
                 B = [B(1:2,1:2); B(4:5,1:2)];
+            end
+        end
+        function [Ak,Bk] = attitudeLVLH(T, is2D)
+            %{
+                Description:
+                ------------
+                Create simple attitude dynamics for LVLH system. This represents relative
+                attitude dynamics to the target/chief spacecraft.
+
+                Parameters:
+                -----------
+                @params T    : (scalar) time step that A,B propagate by
+                @params is2D : (bool) whether to use 2d version or not.    
+                
+                Returns:
+                --------
+                returns (A,B) matrices to use in xk+1 = A*xk + B*uk
+            %}
+            %define the dynamics xdot = Ax + Bu
+            if is2D
+                %yaw, yawdot
+
+                % x (2,1)
+                % u (1,1)
+                A = [0,1;0,0];
+                B = [0;1];
+                statespace = ss(A,B,eye(2),zeros(2,1));
+                out = c2d(statespace,T);
+            else
+                %roll,pitch,yaw,rolldot,pitchdot,yawdot
+
+                % x (6,1)
+                % u (3,1)
+                A = [zeros(3,3),eye(3);zeros(3,6)];
+                B = [zeros(3,3);eye(3)];
+                statespace = ss(A,B,eye(6),zeros(6,3));
+                out = c2d(statespace,T);
+            end
+            Ak = out.A;
+            Bk = out.B;
+        end
+        function dtraj = attitudeMotion(t, traj0, u, is2D)
+            ut = u(t);
+            if is2D
+                yaw = traj0(1);
+
+                yawdot = traj0(2);
+
+                u_yaw = ut(1);
+
+                yawdotdot = u_yaw;
+
+                dtraj = [yawdot;yawdotdot];
+            else
+                roll = traj0(1);
+                pitch = traj0(2);
+                yaw = traj0(3);
+
+                rolldot = traj0(4);
+                pitchdot = traj0(5);
+                yawdot = traj0(6);
+
+                
+                u_roll = ut(1);
+                u_pitch = ut(2);
+                u_yaw = ut(3);
+
+                rolldotdot = u_roll;
+                pitchdotdot = u_pitch;
+                yawdotdot = u_yaw;
+
+                dtraj = [rolldot;pitchdot;yawdot;rolldotdot;pitchdotdot;yawdotdot];
             end
         end
         function dtraj = nonlinearMotion(t,traj0, mu_GM, R, u, is2D)
@@ -102,6 +191,11 @@ classdef ARPOD_Dynamics
             [ts, trajs] = ode45(motion, 0:tstep, traj0);
             traj = transpose(trajs(length(trajs),:));
         end
+        function traj = attitudeSolver(traj0, u, tstep, is2D)
+            motion = @(t,traj) ARPOD_Dynamics.attitudeMotion(t,traj,u,is2D);
+            [ts,trajs] = ode45(motion, 0:tstep, traj0);
+            traj = transpose(trajs(length(trajs),:));
+        end
         function jacobianMat = motionJacobian(t,traj0, mu_GM, R,u)
             n = sqrt(mu_GM / (R.^3)); %orbital velocity
             x = traj0(1);
@@ -136,6 +230,10 @@ classdef ARPOD_Dynamics
             obj.traj = traj0;
             obj.thruster_type = thruster_type;
         end
+        function obj = initAttitude(obj, traj0)
+            obj.att_traj = traj0;
+            obj.use_attitude = true;
+        end
         function obj = nextStep(obj, control_input, tstep, R, mu_GM, noise_model)
             %{
                 Thruster Types:
@@ -152,8 +250,15 @@ classdef ARPOD_Dynamics
             end
             obj.traj = ARPOD_Dynamics.nonlinearMotionSolver(obj.traj, R, mu_GM, ut, tstep, obj.is2D) + noise_model();
         end
+        function obj = nextAttitudeStep(obj, control_input, tstep, noise_model)
+            ut = @(t) control_input;
+            obj.att_traj = ARPOD_Dynamics.attitudeSolver(obj.att_traj, ut, tstep, obj.is2D) + noise_model();
+        end
         function traj = currentTraj(obj)
             traj = obj.traj;
+        end
+        function traj = currentAtt(obj)
+            traj = obj.att_traj;
         end
     end
 end
