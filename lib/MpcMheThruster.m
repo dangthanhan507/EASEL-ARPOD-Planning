@@ -13,6 +13,16 @@
 % ============================================================
 
 classdef MpcMheThruster
+    %{
+        Design of MPCMHE w/ Attitude.
+        =============================
+            -> Because of the complexity of changing the A and B matrices to perform MPC-MHE and attitude and translation,
+                it won't be abstracted in the A and B matrices.
+            -> This design allows for shared parameters between translation and attitude
+            -> Instead, we treat the formulation of attitude and translation MPC-MHE separately.
+
+            -> We track a set of "attitude" version of the regular MPC-MHE variables in this class.
+    %}
     properties
         %TensCalc Specific parameters
         version
@@ -35,6 +45,7 @@ classdef MpcMheThruster
         window_mpcstates   %decision variable in optimiation
 
 
+        %mpc window for attitude
         window_mheattcontrols
         window_attmeasurements
         window_mheattstates
@@ -153,9 +164,20 @@ classdef MpcMheThruster
 
         end
         function obj = initAtt(obj, att0, Aatt, Batt, attcontrol_dim)
-
-
             %{
+                Description:
+                ------------
+                Initializes object just specifically for attitude
+                Do this after you call init() constructor.
+                
+                Parameters
+                -----------
+                @params att0          :   initial attitude state
+                @params Aatt          :   propagation dynamics matrix for the attitude state
+                @params Batt          :   propagation dynamics matrix for the control input
+                @params attcontrol_dim:   scalar representing vector length of control inputs
+
+
                 TensCalc variables for attitude
             %}
             [dim,n] = size(att0);
@@ -192,7 +214,6 @@ classdef MpcMheThruster
                 x_k+1 = A*x_k + B*u_k
 
                 This is where we will define this in a way we can interface with Tenscalc
-
                 You can consider this a helper function for the optimize() function.
 
                 Parameters:
@@ -213,6 +234,19 @@ classdef MpcMheThruster
         end
 
         function xDynamics = setupAttDynamicConstraints(obj)
+            %{
+                Description:
+                ------------
+                This is a repeat code of the translational dynamics.
+                
+                Parameters:
+                ------------
+                N/A
+
+                Returns:
+                --------
+                returns dynamics constraint instance for TensCalc for attitude dynamics
+            %}
             xk = [obj.Tatt0, obj.Tatt(:,1:end-1)];
             u = [obj.Tattuback, obj.Tattuforward];
 
@@ -264,6 +298,19 @@ classdef MpcMheThruster
             yConstr = (obj.Tyback == C*xk + obj.Tvback);
         end
         function yConstr = setupAttSensorConstr(obj)
+            %{
+                Description:
+                ------------
+                This is a repeat code of the sensor constraint code but for attitude.
+                
+                Parameters:
+                ------------
+                N/A
+
+                Returns:
+                --------
+                returns dynamics constraint instance for TensCalc for attitude measurements.
+            %}
             xk = obj.Tatt(:,1:obj.backwardT);
             [dim,n] = size(obj.att0);
 
@@ -297,6 +344,19 @@ classdef MpcMheThruster
             J = J - 10*norm2(obj.Td) - 100*norm2(obj.Tvback);
         end
         function Jatt = objectiveAtt(obj)
+            %{
+                Description:
+                ------------
+                This is a repeat code of the cost function code but for attitude.
+                
+                Parameters:
+                ------------
+                N/A
+
+                Returns:
+                --------
+                returns cost
+            %}
             Jatt = 10*norm2(obj.Tatt(:,obj.backwardT+1:obj.forwardT));
             Jatt = Jatt + 10*norm2(obj.Tattuforward);
             Jatt = Jatt - 100*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
@@ -444,6 +504,27 @@ classdef MpcMheThruster
             obj.window_mpcstates = zeros(state_dim, obj.forwardT);
         end
         function obj = setupAttWindows(obj, window_states, window_measurements, window_controls)
+            %{
+                Description:
+                ------------
+                MPC-MHE repeat of setupWindows but for attitude
+
+                Parameters:
+                -----------
+                @params window_states       : (S, N_mhe) matrix representing states for MHE.
+                @params window_measurements : (M, N_mhe) matrix representing measurements for MHE.
+                @params window_controls     : (C, N_mhe) matrix representing past control for MHE.
+
+                S     = dimension of state vector
+                M     = dimension of sensor
+                C     = dimension of control vector
+                N_mhe = obj.mhe_horizon (how far back to look for mhe)
+
+                Returns:
+                --------
+                Class instance with updated windows ready to work with tenscalc optimization.
+                Can call optimize() now.
+            %}
             [control_dim, n] = size(window_controls);
             [state_dim, n] = size(window_states);
             [meas_dim, n] = size(window_measurements);
@@ -517,6 +598,23 @@ classdef MpcMheThruster
             obj.window_measurements = [obj.window_measurements(:,2:end), measurement];
         end
         function obj = shiftAttitudeWindows(obj, measurement, control)
+            %{
+                Description:
+                ------------
+                Repeat of shifting windows code but for attitude.
+
+                Parameters:
+                -----------
+                @params measurement: (M,1) vector representing incoming sensor measurement
+                @params control    : (D,1) vector representing recent control input used
+
+                M: dimension of sensor measurement.
+                D: dimension of control input.
+
+                Returns:
+                --------
+                class instance with its window data structures shifted for attitude
+            %}
             obj.att0 = obj.window_mheattstates(:,1);
 
             %shift and use obj.window_mpcstates as a "predicted variable" for warm-start
@@ -645,6 +743,27 @@ classdef MpcMheThruster
             mpcUs = obj.window_mpccontrols;
         end
         function [mheXs, mheVs, mpcXs, mpcUs] = getOptimizeResultAttitude(obj)
+            %{
+                Description:
+                -----------
+                Takes saved results of optimize() into attitude data structures.
+                and returns them for user.
+
+                Parameters:
+                -----------
+                N/A
+                Returns:
+                --------
+                @return mheXs: states estimated by MHE [N, backwardT]
+                @return mheDs: control input error estimated by MHE [N, backwardT]
+                @return mheVs: measurement error estimated by MHE [C, backwardT]
+                @return mpcXs: states for optimal path created by MPC [N, forwardT]
+                @return mpcUs: control inputs used for optimal path created by MPC [M, forwardT]
+
+                N: dimension of state
+                M: dimension of control input
+                C: dimension of sensor measurement                
+            %}
             mheXs = obj.window_mheattstates;
             mheVs = obj.window_attmeasError;
             mpcXs = obj.window_mpcattstates;
@@ -669,17 +788,61 @@ classdef MpcMheThruster
             u = obj.window_mpccontrols(:,1);
         end
         function u = getMPCAttControl(obj)
+            %{
+                Description:
+                ------------
+                Getter method to access MPC optimized contorl input for ATTITUDE
+
+                Parameters:
+                -----------
+                N/A
+
+                Access Notes:
+                -------------
+                Only call this after calling optimize(). Otherwise, you will not get
+                results stored in the window objects and what this returns will pretty
+                much be useless.
+            %}
             u = obj.window_mpcattcontrols(:,1);
         end
         function x = getMHEState(obj)
             %{
-                TODO: Add Docstring
+                Description:
+                ------------
+                Getter method to access MHE optimized state
+
+                Parameters:
+                -----------
+                N/A
+
+                Access Notes:
+                -------------
+                Only call this after calling optimize(). Otherwise, you will not get
+                results stored in the window objects and what this returns will pretty
+                much be useless.
             %}
             x = obj.window_mhestates(:,end);
         end
         function x = getMHEAttState(obj)
+            %{
+                Description:
+                ------------
+                Getter method to access MHE optimized state for ATTITUDE
+
+                Parameters:
+                -----------
+                N/A
+
+                Access Notes:
+                -------------
+                Only call this after calling optimize(). Otherwise, you will not get
+                results stored in the window objects and what this returns will pretty
+                much be useless.
+            %}
             x = obj.window_mheattstates(:,end);
         end
+
+        
         %{
             TODO: implement a runController(meas,control) that outputs current estimated state and controls
 

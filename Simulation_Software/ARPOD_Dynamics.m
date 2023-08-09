@@ -23,7 +23,23 @@ classdef ARPOD_Dynamics
     end
     methods (Static)
         function [A,B] = linearHCWDynamics(T, mu_GM, R, is2D)
+            %{
+                Description:
+                ------------
+                Create relative orbital dynamics discrete propagation matrices
+                using HCW equations. (A,B)
 
+                Parameters:
+                -----------
+                @params T    : (scalar) time step that A,B propagate by
+                @params mu_GM: (scalar) gravitational constant used in ARPOD
+                @params R    : (scalar) radial distance from spacecraft to earth
+                @params is2D : (bool) whether to use 2d version or not.    
+
+                Returns:
+                --------
+                returns (A,B) matrices to use in xk+1 = A*xk + B*uk
+            %}
             n = sqrt(mu_GM / (R.^3) );
             A = zeros(6,6);
             B = zeros(6,3);
@@ -51,6 +67,21 @@ classdef ARPOD_Dynamics
             end
         end
         function [Ak,Bk] = attitudeLVLH(T, is2D)
+            %{
+                Description:
+                ------------
+                Create simple attitude dynamics for LVLH system. This represents relative
+                attitude dynamics to the target/chief spacecraft.
+
+                Parameters:
+                -----------
+                @params T    : (scalar) time step that A,B propagate by
+                @params is2D : (bool) whether to use 2d version or not.    
+                
+                Returns:
+                --------
+                returns (A,B) matrices to use in xk+1 = A*xk + B*uk
+            %}
             %define the dynamics xdot = Ax + Bu
             if is2D
                 %yaw, yawdot
@@ -75,7 +106,6 @@ classdef ARPOD_Dynamics
             Bk = out.B;
         end
         function dtraj = attitudeMotion(t, traj0, u, is2D)
-
             ut = u(t);
             if is2D
                 yaw = traj0(1);
