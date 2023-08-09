@@ -47,7 +47,6 @@ classdef ThrusterBenchmark
     methods 
         function obj = init(obj, useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude)
             %{
-                TODO: fill this docstring
                 Description:
                 ------------
 
@@ -104,7 +103,6 @@ classdef ThrusterBenchmark
                 TODO: fill this docstring
                 Description:
                 ------------
-
 
                 Parameters:
                 -----------
@@ -163,7 +161,7 @@ classdef ThrusterBenchmark
             if obj.use_attitude
                 mpcmhe = mpcmhe.initAtt(att0, Aatt, Batt, attcontrol_dim);
             end
-            mpcmhe = mpcmhe.setupOptimize(0.01, 0.03, 0.1, 200);
+            mpcmhe = mpcmhe.setupOptimize(0.09, 0.05, 0.1, 1000);
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
@@ -241,6 +239,9 @@ classdef ThrusterBenchmark
 
                 mpcmhe = mpcmhe.shiftWindows(meas, u);
                 mpcmhe = mpcmhe.optimize();
+                [mheXs, mheDs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResult();
+                disp("noise: ")
+                disp(mheDs)
                 u = mpcmhe.getMPCControl();
                 est_traj = mpcmhe.getMHEState();
 
