@@ -12,7 +12,7 @@
 %
 % ============================================================
 
-classdef MpcMheThruster
+classdef MpcMheNaive
     %{
         Design of MPCMHE w/ Attitude.
         =============================
@@ -28,6 +28,8 @@ classdef MpcMheThruster
         version
         codeType
         compilerFlags
+
+        maxIter
 
         %boolean
         use_attitude = false; % do we use attitude
@@ -91,9 +93,6 @@ classdef MpcMheThruster
         Bk % invariant discrete dynamics matrix for control input
 
         % misalignment variables
-        % TODO: not there yet... lets get there
-        A_x %matrix bias
-        b_x %additive bias
     end
     methods
         function obj = init(obj, x0_, backwardT, forwardT, A, B, meas_dim, control_dim)
@@ -142,7 +141,7 @@ classdef MpcMheThruster
             %}
             Tvariable x0a   [dim,1];
             Tvariable x     [dim, backwardT + forwardT];
-            Tvariable d     [control_dim, backwardT + forwardT];
+            Tvariable d     [control_dim, 1];
             Tvariable uback [control_dim, backwardT];
             Tvariable vback [meas_dim, backwardT];
             Tvariable u     [control_dim, forwardT];
@@ -229,8 +228,11 @@ classdef MpcMheThruster
             xk = [obj.Tx0, obj.Tx(:,1:end-1)];
             u = [obj.Tuback, obj.Tuforward];
 
+            for n = 1:obj.backwardT+obj.forwardT
+                u(:,n) = u(:,n) + obj.Td;
+            end
             %return
-            xDynamics = (obj.Tx == obj.Ak*xk + obj.Bk*(u+obj.Td));
+            xDynamics = (obj.Tx == obj.Ak*xk + obj.Bk*u);
         end
 
         function xDynamics = setupAttDynamicConstraints(obj)
@@ -339,9 +341,9 @@ classdef MpcMheThruster
                 ----------
                 returns objective function instance for TensCalc format
             %}
-            J = 10*norm2(obj.Tx(:,obj.backwardT+1:obj.forwardT));
-            J = J + 10*norm2(obj.Tuforward);
-            J = J - 100*norm2(obj.Td) - 10*norm2(obj.Tvback);
+            J = 1e3*norm2(obj.Tx(:,obj.backwardT+1:obj.forwardT));
+            J = J + 1*norm2(obj.Tuforward);
+            J = J - 1*norm2(obj.Td) - 1*norm2(obj.Tvback);
         end
         function Jatt = objectiveAtt(obj)
             %{
@@ -359,7 +361,7 @@ classdef MpcMheThruster
             %}
             Jatt = 10*norm2(obj.Tatt(:,obj.backwardT+1:obj.forwardT));
             Jatt = Jatt + 10*norm2(obj.Tattuforward);
-            Jatt = Jatt - 100*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
+            Jatt = Jatt - 10*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
         end
         function obj = setupOptimize(obj, vMax, dMax, uMax, maxIter)
             %{
@@ -383,6 +385,8 @@ classdef MpcMheThruster
                 -------
                 class instance with full optimization setup.
             %}
+            obj.maxIter = maxIter;
+
             J = obj.objectiveF();
 
             if obj.use_attitude
@@ -412,6 +416,7 @@ classdef MpcMheThruster
 
             outputExpressionsCell = {J,obj.Tuforward,obj.Td,obj.Tx0,obj.Tx, obj.Tvback};
             parametersCell = {obj.Tuback,obj.Tyback};
+            
 
             if obj.use_attitude
                 attYConstr = obj.setupAttSensorConstr();
@@ -495,7 +500,7 @@ classdef MpcMheThruster
             obj.window_measurements = window_measurements;
 
             %setup mhe disturbance window
-            obj.window_controlDisturbances = zeros(control_dim, obj.forwardT + obj.backwardT);
+            obj.window_controlDisturbances = zeros(control_dim, 1);
             obj.window_measError = zeros(meas_dim, obj.backwardT);
 
             %setup mpc windows
@@ -580,8 +585,8 @@ classdef MpcMheThruster
             obj.window_mpcstates = [obj.window_mpcstates(:,2:end), obj.Ak*obj.window_mpcstates(:,end)];
 
             %assume last element no control disturbance for warm-start
-            [dim,n] = size(obj.window_controlDisturbances);
-            obj.window_controlDisturbances = [obj.window_controlDisturbances(:,2:end), zeros(dim,1)];
+            % [dim,n] = size(obj.window_controlDisturbances);
+            % obj.window_controlDisturbances = [obj.window_controlDisturbances(:,2:end), zeros(dim,1)];
 
             %assume no measError on last element for warm-start
             [dim,n] = size(obj.window_measError);
@@ -675,11 +680,10 @@ classdef MpcMheThruster
             end
 
             mu0 = 1;
-            maxIter = 100;
             saveIter = -1;
 
             %TODO: parse the status, iter, and time for anything useful to know (throw errors if necessary)
-            [status, iter, time] = solve(obj.opt, mu0, int32(maxIter), int32(saveIter));
+            [status, iter, time] = solve(obj.opt, mu0, int32(obj.maxIter), int32(saveIter));
 
             if obj.use_attitude
                 [Jcost, mpcUs, mheDs, x0s, xs, vs, mpcAttUs, att0s, attXs, mheAttVs] = getOutputs(obj.opt);
@@ -696,6 +700,10 @@ classdef MpcMheThruster
             mheXs = xs(:,1:obj.backwardT);
             mpcXs = xs(:,obj.backwardT+1:end);
 
+            disp("opt results:")
+            disp(Jcost)
+            disp(mpcXs(:,1))
+            disp(mpcUs(:,1))
 
             %save everything into mpcmhe
             obj.window_controlDisturbances = mheDs;
