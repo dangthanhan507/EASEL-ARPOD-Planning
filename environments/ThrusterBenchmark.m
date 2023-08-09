@@ -145,7 +145,7 @@ classdef ThrusterBenchmark
             %MPC-MHE setup
             %=====================
             %plug in state dim for measurement dim (we assume full state measurements)
-            mpcmhe = MpcMheThruster;
+            mpcmhe = MpcMheTransform;
 
             if obj.use_2d
                 control_dim = 2;
@@ -161,7 +161,7 @@ classdef ThrusterBenchmark
             if obj.use_attitude
                 mpcmhe = mpcmhe.initAtt(att0, Aatt, Batt, attcontrol_dim);
             end
-            mpcmhe = mpcmhe.setupOptimize(0.09, 0.05, 0.1, 1000);
+            mpcmhe = mpcmhe.setupOptimize(0.01, 1.5, 0.1, 1000);
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
@@ -227,7 +227,7 @@ classdef ThrusterBenchmark
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
-                Mission = Mission.nextStep(u + disturbance,noiseQ,noiseR,true);
+                Mission = Mission.nextStep(disturbance*u,noiseQ,noiseR,true);
                 if obj.use_attitude
                     Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 
@@ -240,8 +240,6 @@ classdef ThrusterBenchmark
                 mpcmhe = mpcmhe.shiftWindows(meas, u);
                 mpcmhe = mpcmhe.optimize();
                 [mheXs, mheDs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResult();
-                disp("noise: ")
-                disp(mheDs)
                 u = mpcmhe.getMPCControl();
                 est_traj = mpcmhe.getMHEState();
 

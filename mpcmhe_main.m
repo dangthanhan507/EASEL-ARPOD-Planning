@@ -17,7 +17,7 @@ use2D = false;
 useNonlinear = true;
 useAttitude = false;
 mpc_horizon = 40; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-mhe_horizon = 10;
+mhe_horizon = 20;
 total_time = 100; %total time in seconds
 tstep = 1;        %each time step is 1 second
 
@@ -40,9 +40,25 @@ benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, t
 %3d no att
 noiseQ = @() [0;0;0;0;0;0];
 noiseR = @() [0;0;0;0;0;0];
-traj0 = [1;1;1;0;0;0];
+traj0 = [10;10;10;0;0;0];
 
-disturbance = [0.03;0.03;0.03];
+% disturbance = [0.03;0.03;0.03];
+
+% disturbance = eye(3);
+
+% a = 0;
+% b = pi/3;
+% c = -pi/3;
+% Rx = [1 0 0; 0 cos(a) -sin(a); 0 sin(a) cos(a)];
+% Ry = [cos(b) 0 sin(b); 0 1 0; -sin(b) 0 cos(b)];
+% Rz = [cos(c) -sin(c) 0; sin(c) cos(c) 0; 0 0 1];
+% disturbance = Rz*Ry*Rx;
+
+disturbance = [0,1,0;
+               0,0,1;
+               1,0,0];
 benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance);
 
+disp("Actual transform: ")
+disp(disturbance)
 delete("tmpC*") %delete any temporary files created
