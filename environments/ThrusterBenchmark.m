@@ -98,7 +98,7 @@ classdef ThrusterBenchmark
                 attTraj = nargin;
             end
         end
-        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance)
+        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance, MpcMheType)
             %{
                 TODO: fill this docstring
                 Description:
@@ -145,7 +145,7 @@ classdef ThrusterBenchmark
             %MPC-MHE setup
             %=====================
             %plug in state dim for measurement dim (we assume full state measurements)
-            mpcmhe = MpcMheTransform;
+            mpcmhe = MpcMheType;
 
             if obj.use_2d
                 control_dim = 2;
