@@ -40,6 +40,21 @@ classdef ThrusterBenchmark
         true_att_trajs
         est_att_trajs
         att_controls
+        att_meas
+
+
+        %save output of the controller per timestep
+        mheXs
+        mheDs
+        mheVs
+        mpcXs
+        mpcUs
+
+        mheXsAtt
+        mheDsAtt
+        mheVsAtt
+        mpcXsAtt
+        mpcUsAtt
 
     end
     methods 
@@ -219,9 +234,24 @@ classdef ThrusterBenchmark
             obj.measurements    = zeros(state_dim,  num_steps);
             obj.control_vectors = zeros(control_dim, num_steps);
 
-            obj.true_att_trajs  = zeros(attstate_dim, num_steps);
-            obj.est_att_trajs   = zeros(attstate_dim, num_steps);
-            obj.att_controls    = zeros(attcontrol_dim, num_steps);
+            obj.mheXs           = cell(num_steps);
+            obj.mheDs           = cell(num_steps);
+            obj.mheVs           = cell(num_steps);
+            obj.mpcXs           = cell(num_steps);
+            obj.mpcUs           = cell(num_steps);
+
+            if obj.use_attitude
+                obj.true_att_trajs  = zeros(attstate_dim, num_steps);
+                obj.est_att_trajs   = zeros(attstate_dim, num_steps);
+                obj.att_meas        = zeros(attstate_dim, num_steps);
+                obj.att_controls    = zeros(attcontrol_dim, num_steps);
+
+                obj.mheXsAtt           = cell(num_steps);
+                obj.mheDsAtt           = cell(num_steps);
+                obj.mheVsAtt           = cell(num_steps);
+                obj.mpcXsAtt           = cell(num_steps);
+                obj.mpcUsAtt           = cell(num_steps);
+            end    
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
@@ -237,18 +267,31 @@ classdef ThrusterBenchmark
 
                 mpcmhe = mpcmhe.shiftWindows(meas, u);
                 mpcmhe = mpcmhe.optimize();
-                [mheXs, mheDs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResult();
                 u = mpcmhe.getMPCControl();
                 est_traj = mpcmhe.getMHEState();
 
-                if obj.use_attitude                    
+
+                [mheXs, mheDs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResult();
+                obj.mheXs{idx} = mheXs;
+                obj.mheDs{idx} = mheDs;
+                obj.mheVs{idx} = mheVs;
+                obj.mpcXs{idx} = mpcXs;
+                obj.mpcUs{idx} = mpcUs;
+                if obj.use_attitude
+                    [mheXs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResultAttitude(obj)                    
                     uatt = mpcmhe.getMPCAttControl();
                     est_att_traj = mpcmhe.getMHEAttState();
 
                     obj.true_att_trajs(:,idx) = Mission.att;
                     obj.est_att_trajs(:,idx) = est_att_traj;
-
+                    obj.att_meas(:,idx) = att_meas;
                     obj.att_controls(:,idx) = uatt;
+
+                    obj.mheXsAtt{idx} = mheXs;
+                    obj.mheDsAtt{idx} = mheDx;
+                    obj.mheVsAtt{idx} = mheVs;
+                    obj.mpcXsAtt{idx} = mpcXs;
+                    obj.mpcUsAtt{idx} = mpcUs;
                 end
 
 
