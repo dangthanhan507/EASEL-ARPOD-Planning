@@ -41,8 +41,6 @@ classdef ThrusterBenchmark
         est_att_trajs
         att_controls
 
-        %TODO: add its usage after discussing with copp
-        disturbances
     end
     methods 
         function obj = init(obj, useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude)
@@ -98,7 +96,7 @@ classdef ThrusterBenchmark
                 attTraj = nargin;
             end
         end
-        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance, MpcMheType)
+        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance_fn, MpcMheType)
             %{
                 TODO: fill this docstring
                 Description:
@@ -161,7 +159,7 @@ classdef ThrusterBenchmark
             if obj.use_attitude
                 mpcmhe = mpcmhe.initAtt(att0, Aatt, Batt, attcontrol_dim);
             end
-            mpcmhe = mpcmhe.setupOptimize(0.01, 1.5, 0.1, 1000);
+            mpcmhe = mpcmhe.setupOptimize();
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
@@ -227,7 +225,7 @@ classdef ThrusterBenchmark
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
-                Mission = Mission.nextStep(disturbance*u,noiseQ,noiseR,true);
+                Mission = Mission.nextStep(disturbance_fn(u),noiseQ,noiseR,true);
                 if obj.use_attitude
                     Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 

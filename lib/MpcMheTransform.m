@@ -92,7 +92,15 @@ classdef MpcMheTransform
         Ak % invariant discrete dynamics matrix for state
         Bk % invariant discrete dynamics matrix for control input
 
-        % misalignment variables
+        %
+        mpcCostQ
+        mpcCostR
+        mheCostQ
+        mheCostR
+
+        vMax
+        dMax
+        uMax
     end
     methods
         function obj = init(obj, x0_, backwardT, forwardT, A, B, meas_dim, control_dim)
@@ -318,6 +326,12 @@ classdef MpcMheTransform
             yConstr = (obj.Tattyback == C*xk + obj.Tattvback);
         end
         %setting up objective
+        function obj = setupCostGains(obj, mpcCostQ, mpcCostR, mheCostQ, mheCostR)
+            obj.mpcCostQ = mpcCostQ;
+            obj.mpcCostR = mpcCostR;
+            obj.mheCostQ = mheCostQ;
+            obj.mheCostR = mheCostR;
+        end
         function J = objectiveF(obj)
             %{
                 Description:
@@ -338,9 +352,9 @@ classdef MpcMheTransform
                 ----------
                 returns objective function instance for TensCalc format
             %}
-            J = 1e3*norm2(obj.Tx(:,obj.backwardT+1:obj.forwardT));
-            J = J + 1*norm2(obj.Tuforward);
-            J = J - 100*norm2(obj.Td) - 1*norm2(obj.Tvback);
+            J = obj.mpcCostQ*norm2(obj.Tx(:,obj.backwardT+1:obj.forwardT));
+            J = J + obj.mpcCostR*norm2(obj.Tuforward);
+            J = J - obj.mheCostQ*norm2(obj.Td) - obj.mheCostR*norm2(obj.Tvback);
         end
         function Jatt = objectiveAtt(obj)
             %{
@@ -356,11 +370,17 @@ classdef MpcMheTransform
                 --------
                 returns cost
             %}
-            Jatt = 10*norm2(obj.Tatt(:,obj.backwardT+1:obj.forwardT));
-            Jatt = Jatt + 10*norm2(obj.Tattuforward);
-            Jatt = Jatt - 10*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
+            Jatt = obj.mpcCostQ*norm2(obj.Tatt(:,obj.backwardT+1:obj.forwardT));
+            Jatt = Jatt + obj.mpcCostR*norm2(obj.Tattuforward);
+            Jatt = Jatt - obj.mheCostR*norm2(obj.Tattvback); %NOTE: doesn't add dynamic noise anywhere
         end
-        function obj = setupOptimize(obj, vMax, dMax, uMax, maxIter)
+        function obj = setupOptimizeGains(obj, vMax, dMax, uMax, maxIter)
+            obj.vMax = vMax;
+            obj.dMax = dMax;
+            obj.uMax = uMax;
+            obj.maxIter = maxIter;
+        end
+        function obj = setupOptimize(obj)
             %{
                 Description:
                 ------------
@@ -382,7 +402,11 @@ classdef MpcMheTransform
                 -------
                 class instance with full optimization setup.
             %}
-            obj.maxIter = maxIter;
+            vMax = obj.vMax;
+            dMax = obj.dMax;
+            uMax = obj.uMax;
+            maxIter = obj.maxIter;
+
 
             J = obj.objectiveF();
 

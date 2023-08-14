@@ -5,6 +5,7 @@ addpath './Software2/tenscalc' -begin
 addpath './environments' -begin
 addpath './lib' -begin
 addpath './Simulation_Software' -begin
+addpath './GraphLib' -begin
 
 install_funpartools
 install_cmextools
