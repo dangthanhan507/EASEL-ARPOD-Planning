@@ -54,6 +54,14 @@ function nothing = mpcmhe_main(mode)
         mpcmheType = mpcmheType.setupOptimizeGains(0.07,1.3,0.1,1000);
     else
         %Time invariant matrix transform and additive disturbance on control vector
+        disturbanceD = eye(3);
+        disturbanced = zeros(3,1);
+
+        disturbance_fn = @(u) disturbanceD*u + disturbanced;
+
+        mpcmheType = MpcMheFull;
+        mpcmheType = mpcmheType.setupCostGains(1e3,10,1,1);
+        mpcmheType = mpcmheType.setupOptimizeGains(0.07,1.3,0.1,1000);
     end
 
     benchmark = ThrusterBenchmark;
