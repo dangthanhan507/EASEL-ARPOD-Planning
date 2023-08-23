@@ -67,7 +67,22 @@ classdef MPCMHE_properties
             obj.solverVerboseLevel = 1;
             obj.verboseLevel = 1;
         end
+        function obj = concat(obj, other)
+            %{
+                concatenate two constraints together.
+                mostly used for concatenating attitude and translationsal formulations when needed
+            %}
+            obj.P1optimizationVariablesCell = [obj.P1optimizationVariablesCell, other.obj.P1optimizationVariablesCell];
+            obj.P2optimizationVariablesCell = [obj.P2optimizationVariablesCell, other.obj.P2optimizationVariablesCell];
+            obj.latentVariablesCell = [obj.latentVariablesCell, other.latentVariablesCell];
 
+            obj.P1constraintsCell = [obj.P1constraintsCell, other.P1constraintsCell];
+            obj.P2constraintsCell = [obj.P2constraintsCell, other.P2constraintsCell];
+            obj.latentConstraintsCell = [obj.latentConstraintsCell, other.latentConstraintsCell];
+
+            obj.outputExpressionsCell = [obj.outputExpressionsCell, other.outputExpressionsCell];
+            obj.parametersCell = [obj.parametersCell, other.parametersCell];
+        end
         function opt = setupOptimization(obj)
             classname = class2equilibriumLatentCS(...
                 'classname','tmpC_target_chaser_main',...
@@ -95,6 +110,5 @@ classdef MPCMHE_properties
                 'verboseLevel',obj.verboseLevel); 
             opt = feval(classname);
         end
-
     end
 end

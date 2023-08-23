@@ -2,6 +2,8 @@ classdef MPCMHE_windows
     properties
         x0
 
+        disturbType
+
         window_mhestates
         window_mhecontrols
         window_measurements
@@ -13,8 +15,8 @@ classdef MPCMHE_windows
         window_mpccontrols
     end
 
-    methods 
-        function obj = init(obj, x0, window_states, window_measurements, window_controls, forwardT)
+    methods
+        function obj = init(obj, x0, window_states, window_measurements, window_controls, forwardT, disturbType)
             obj.x0 = x0;
 
             [control_dim, backwardT] = size(window_controls);
@@ -27,8 +29,19 @@ classdef MPCMHE_windows
             obj.window_mhecontrols = window_controls;
             obj.window_measurements = window_measurements;
 
+            obj.disturbType = disturbType;
             %setup mhe disturbance window
-            obj.window_controlDisturbances = [eye(control_dim, control_dim), zeros(control_dim,1)];
+            if disturbType == 0
+                obj.window_controlDisturbances = zeros(control_dim,1);
+            elseif disturbType == 1
+                obj.window_controlDisturbances = zeros(control_dim,backwardT + forwardT);
+            elseif disturbType == 2
+                obj.window_controlDisturbances = zeros(control_dim,1);
+            elseif disturbType == 3
+                obj.window_controlDisturbances = zeros(control_dim,control_dim);
+            else
+                obj.window_controlDisturbances = [eye(control_dim,control_dim). zeros(control_dim,1)];
+            end
 
             obj.window_measError = zeros(meas_dim, obj.backwardT);
 
@@ -66,6 +79,18 @@ classdef MPCMHE_windows
 
             %push new measurement into mhe measurements
             obj.window_measurements = [obj.window_measurements(:,2:end), measurement];
+
+            if obj.disturbType == 0
+                obj.window_controlDisturbances = zeros(control_dim,1);
+            elseif obj.disturbType == 1
+                obj.window_controlDisturbances = [obj.window_controlDisturbances(:,2:end), obj.window_controlDisturbances(:,end)];
+            elseif obj.disturbType == 2
+                %nothin for TI
+            elseif obj.disturbType == 3
+                %nothin for TI
+            else
+                %nothin for TI
+            end
         end
 
         function [mheXs, mheVs, mpcXs, mpcUs] = getOptWindows(obj)

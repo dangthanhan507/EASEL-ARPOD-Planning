@@ -36,6 +36,7 @@ classdef ThrusterBenchmark
         estimated_trajs
         measurements
         control_vectors
+        true_control
 
         true_att_trajs
         est_att_trajs
@@ -233,6 +234,7 @@ classdef ThrusterBenchmark
             obj.estimated_trajs = zeros(state_dim, num_steps);
             obj.measurements    = zeros(state_dim,  num_steps);
             obj.control_vectors = zeros(control_dim, num_steps);
+            obj.true_control    = zeros(control_dim, num_steps);
 
             obj.mheXs           = cell(num_steps);
             obj.mheDs           = cell(num_steps);
@@ -301,6 +303,7 @@ classdef ThrusterBenchmark
                 obj.estimated_trajs(:,idx) = est_traj;
                 obj.measurements(:,idx) = meas;
                 obj.control_vectors(:,idx) = u;
+                obj.true_control(:,idx) = disturbance_fn(u);
             end
             %==============================
 
