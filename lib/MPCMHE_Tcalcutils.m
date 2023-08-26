@@ -1,11 +1,11 @@
 classdef MPCMHE_Tcalcutils
     methods (Static)
-        function [Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward] = createTenscalcVariables(disturbType, statedim, controldim, backHorizon, forwardHorizon)
+        function [Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward] = createTenscalcVariables(disturbType, statedim, controldim, meas_dim, backHorizon, forwardHorizon)
             Tvariable x0a   [statedim,1];
             Tvariable x     [statedim, backHorizon + forwardHorizon];
             Tvariable uback [controldim, backHorizon];
             Tvariable vback [statedim, backHorizon];
-            Tvariable ypast [statedim, backwardHorizon];
+            Tvariable ypast [meas_dim, backwardHorizon];
             Tvariable u     [controldim, forwardHorizon];
 
             if disturbType == 0
@@ -26,8 +26,8 @@ classdef MPCMHE_Tcalcutils
             Tyback = ypast;
             Tvback = vback;
             Tuforward = u;
-
         end
+        
         function [Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward] = createTenscalcVariablesAttitude(disturbType, statedim, controldim, backHorizon, forwardHorizon)
             %the Tvariable names MATTER SINCE THEY ARE GLOBAL
             Tvariable att0a   [statedim,1];
@@ -127,6 +127,19 @@ classdef MPCMHE_Tcalcutils
             Jcost = mpcQ*norm2(Tx(:,backwardHorizon+1:forwardHorizon)) + mpcR*norm2(control);
             Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(sensor_disturbance);
         end
+        function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
+            opt_properties = MPCMHE_properties;
+            opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
+                                                                {Td, Tvback,Tx0}, ...
+                                                                {Tx},...
+                                                                {Tuforward <= uMax*Tones(size(Tuforward)), Tuforward >= -uMax*Tones(size(Tuforward))},...
+                                                                {Td<=dMax*Tones(size(Td)), Td>=-dMax*Tones(size(Td)),...
+                                                                    Tvback<=vMax*Tones(size(Tvback)), Tvback>=-vMax*Tones(size(Tvback)),...
+                                                                    sensorConstraints},...
+                                                                {dynamicConstraints},...
+                                                                {Tuforward,Td,Tx0,Tx,Tvback},...
+                                                                {Tuback,Tyback});
+        end
         function setupOptimizationVarsTrans(opt, window)
 
             %setting translation stuff
@@ -147,22 +160,33 @@ classdef MPCMHE_Tcalcutils
             setV_att(opt, [window.window_mhestates, window.window_mpcstates]);
             setV_attvback(opt, window.window_measError);
         end
-        function window = mpcmhe_solve(opt, mu0, maxIter, saveIter, use_attitude)
+        function [window,att_window] = mpcmhe_solve(window, att_window, opt, mu0, maxIter, saveIter, use_attitude)
             [status,iter,time] = solve(opt,mu0,maxIter,saveIter);
 
             if use_attitude
-                [Jcost, mpcUs, mheDs, x0s, xs, vs, mpcAttUs, att0s, attXs, mheAttVs] = getOutputs(obj.opt);
+                [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(obj.opt);
                 [measdim,backwardT] = size(vs);
-                [controldim, forwardT] = size(mpcUs);
+                attmheXs = attxs(:,1:backwardT);
+                attmpcXs = attxs(:,backwardT+1:end);
+
+                att_window.window_controlDisturbances = attmheDs;%TODO: FIX THIS
+                att_window.window_measError = attvs;
+                att_window.window_mhestates = attmheXs;
+                att_window.window_mpcstates = attmpcXs;
+                att_window.window_mpccontrols = attmpcUs; %TODO: FIX THIS
 
             else
                 [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(obj.opt); %get results
                 [measdim,backwardT] = size(vs);
-                [controldim, forwardT] = size(mpcUs);
 
             end
             mheXs = xs(:,1:backwardT);
             mpcXs = xs(:,backwardT+1:end);
+            window.window_controlDisturbances = mheDs;
+            window.window_measError = vs;
+            window.window_mhestates = mheXs;
+            window.window_mpcstates = mpcXs;
+            window.window_mpccontrols = mpcUs;
         end
     end
 end
