@@ -29,6 +29,11 @@ classdef MPCMHE
         costFunction
         attcostFunction
 
+        %Variable Limits
+        dMax
+        vMax
+        uMax
+
         %Optimizer wrapper
         opt_properties
 
@@ -48,17 +53,13 @@ classdef MPCMHE
     end
 
     methods
-        function obj = init(obj, disturbType, x0, backwardT, forwardT, meas_dim, control_dim, att_dim)
+        function obj = init(obj, disturbType, backwardT, forwardT, state_dim, meas_dim, control_dim, att_dim)
             [obj.Tx0, obj.Tx, obj.Td, obj.Tuback, obj.Tyback, obj.Tvback, obj.Tuforward] = MPCMHE_Tcalcutils.createTenscalcVariables(disturbType, state_dim, control_dim, meas_dim, backwardT, forwardT);
-            [obj.attTx0, obj.attTx, obj.attTd, obj.attTuback, obj.attTyback, obj.attTvback, obj.attTuforward] = MPCMHE_Tcalcutils.createTenscalcVariablesAttitude(0,att_dim, att_dim, backwardT, forwardT);
+            [obj.attTx0, obj.attTx, obj.attTd, obj.attTuback, obj.attTyback, obj.attTvback, obj.attTuforward] = MPCMHE_Tcalcutils.createTenscalcVariablesAttitude(0,att_dim, att_dim/2, backwardT, forwardT);
 
-            obj.x0 = x0;
             obj.backwardT = backwardT;
             obj.forwardT = forwardT;
             obj.disturbType = disturbType;
-
-            
-            
         end
 
         %%%% TENSCALC SETUP OPTIMIZATION CODE BEGIN %%%%
@@ -69,13 +70,19 @@ classdef MPCMHE
         function obj = setupSimpleObjective(obj, mpcQ, mpcR, mheQ, mheR)
             obj.costFunction = MPCMHE_Tcalcutils.objectiveMPCMHE(mpcQ,mpcR,mheQ,mheR,obj.Tx, obj.Tuforward, obj.Td, obj.Tuforward);
         end
+        function obj = setupVariableLimits(obj, dMax, uMax, vMax)
+            obj.dMax = dMax;
+            obj.uMax = uMax;
+            obj.vMax = vMax;
+        end
         function obj = createOptimization(obj)
             obj.opt_properties = MPCMHE_Tcalcutils.setupOptimizationCells(obj.costFunction,obj.dynamicConstraints, obj.sensorConstraints,...
+                                                        obj.dMax, obj.uMax, obj.vMax,...
                                                         obj.Tx0, obj.Tx, obj.Td, obj.Tuback, obj.Tyback, obj.Tvback,...
                                                         obj.Tuforward);
         end
         function obj = setupAttitudeConstraints(obj, A, B, C)
-            obj.attdynamicConstraints = MPCMHE_Tcalcutils.createLTIDynamicConstraints(A,B,obj.attTx0, obj.attTx, obj.attTuback, obj.attTuforward, obj.attTd, obj.disturbType);
+            obj.attdynamicConstraints = MPCMHE_Tcalcutils.createLTIDynamicConstraints(A,B,obj.attTx0, obj.attTx, obj.attTuback, obj.attTuforward, obj.attTd, 0);
             obj.attsensorConstraints = MPCMHE_Tcalcutils.createLinearSensorConstraint(C, obj.attTx, obj.attTvback, obj.attTyback, obj.backwardT);
         end
         function obj = setupAttitudeCost(obj, mpcQ, mpcR, mheQ, mheR)
@@ -97,7 +104,7 @@ classdef MPCMHE
             obj.window = MPCMHE_windows;
             obj.window = obj.window.init(x0, window_states, window_measurements, window_controls, obj.forwardT, obj.disturbType);
         end
-        function obj = setpAttWindows(obj, x0, window_states, window_measurements, window_controls)
+        function obj = setupAttWindows(obj, x0, window_states, window_measurements, window_controls)
             obj.att_window = MPCMHE_windows;
             obj.att_window = obj.att_window.init(x0, window_states, window_measurements, window_controls, obj.forwardT, 0);
         end
@@ -112,7 +119,7 @@ classdef MPCMHE
             MPCMHE_Tcalcutils.setupOptimizationVarsTrans(obj.opt, obj.window);
             MPCMHE_Tcalcutils.setupOptimizationVarsAtt(ob.opt, obj.att_window);
 
-            [obj.window, obj.att_window] = MPCMHE_Tcalcutils.mpcmhe_solve(obj.opt, 1, 500, -1, 1);
+            [obj.window, obj.att_window] = MPCMHE_Tcalcutils.mpcmhe_solve(obj.window, obj.att_window, obj.opt, 1, 500, -1, 1);
         end
         function u = getControl(obj)
             u = obj.window.window_mpccontrols(:,1);

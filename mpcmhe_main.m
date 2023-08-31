@@ -16,25 +16,34 @@ function nothing = mpcmhe_main(mode)
     total_time = 100; %total time in seconds
     tstep = 1;        %each time step is 1 second
 
+    state_dim = 6;
+    meas_dim = 6;
+    control_dim = 3;
+    att_dim = 6;
+    att_control_dim = 3;
+    
+    mpcmhe = MPCMHE;
+    mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
+    [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
+    [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
+    mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim));
+    mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
+    
     if mode == 1
-        %time varying additive disturbance
         disturbance = [0.03;0.03;0.03];
-
         disturbance_fn = @(u) disturbance + u;
-        mpcmheType = MpcMheThruster;
-
-        mpcmheType = mpcmheType.setupCostGains(1e3,10,1,1);
-        mpcmheType = mpcmheType.setupOptimizeGains(0.05,0.05,0.1,1000);
+        
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     elseif mode == 2
-        %time invariant additive disturbance
         disturbance = [0.03;0.03;0.03];
         disturbance_fn = @(u) disturbance + u;
-        mpcmheType = MpcMheNaive;
-        mpcmheType = mpcmheType.setupCostGains(1e3,10,1,1);
-        mpcmheType = mpcmheType.setupOptimizeGains(0.05,0.05,0.1,1000);
-    elseif mode == 3
-        %Time invariant matrix transform disturbance
 
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+    elseif mode == 3
         disturbance = eye(3);
 
         % a = 0;
@@ -49,20 +58,23 @@ function nothing = mpcmhe_main(mode)
         %             0,0,1;
         %             1,0,0];
         disturbance_fn = @(u) disturbance*u;
-        mpcmheType = MpcMheTransform;
-        mpcmheType = mpcmheType.setupCostGains(1e3,10,1,1);
-        mpcmheType = mpcmheType.setupOptimizeGains(0.07,1.3,0.1,1000);
+
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     else
         %Time invariant matrix transform and additive disturbance on control vector
         disturbanceD = eye(3);
         disturbanced = zeros(3,1);
-
         disturbance_fn = @(u) disturbanceD*u + disturbanced;
-
-        mpcmheType = MpcMheFull;
-        mpcmheType = mpcmheType.setupCostGains(1e3,10,1,1);
-        mpcmheType = mpcmheType.setupOptimizeGains(0.07,1.3,0.1,1000);
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     end
+
+    mpcmhe = mpcmhe.createOptimization();
+    disp("paused")
+    pause
 
     benchmark = ThrusterBenchmark;
     benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude);
@@ -70,6 +82,7 @@ function nothing = mpcmhe_main(mode)
         The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
     %}
 
+    %======================= NOISE ===========================
     % 2d no att
     % noiseQ = @() [0;0;0;0];
     % noiseR = @() [0;0;0;0];
@@ -79,13 +92,14 @@ function nothing = mpcmhe_main(mode)
     % noiseQ = @() [0;0;0;0;0;0];
     % noiseR = @() [0;0;0;0;0;0];
     % traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
+    %======================= NOISE END ========================
 
     %3d no att
     noiseQ = @() [0;0;0;0;0;0];
     noiseR = @() [0;0;0;0;0;0];
     traj0 = [10;10;10;0;0;0];
 
-    benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance_fn,mpcmheType);
+    benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance_fn, mpcmhe);
 
     disp("Actual transform: ")
     disp(disturbance)

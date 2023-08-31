@@ -5,7 +5,7 @@ classdef MPCMHE_Tcalcutils
             Tvariable x     [statedim, backHorizon + forwardHorizon];
             Tvariable uback [controldim, backHorizon];
             Tvariable vback [statedim, backHorizon];
-            Tvariable ypast [meas_dim, backwardHorizon];
+            Tvariable ypast [meas_dim, backHorizon];
             Tvariable u     [controldim, forwardHorizon];
 
             if disturbType == 0
@@ -34,7 +34,7 @@ classdef MPCMHE_Tcalcutils
             Tvariable att     [statedim, backHorizon + forwardHorizon];
             Tvariable attuback [controldim, backHorizon];
             Tvariable attvback [statedim, backHorizon];
-            Tvariable attypast [statedim, backwardHorizon];
+            Tvariable attypast [statedim, backHorizon];
             Tvariable attu     [controldim, forwardHorizon];
 
             if disturbType == 0
@@ -62,7 +62,7 @@ classdef MPCMHE_Tcalcutils
                 --------
             %}
 
-            xk = [Tx0, Tx(:,1:end-1)];
+            xk = [Tx0, Tx(:,1:end-1)];  
             uk = [uback, uforward];
 
             [control_dim, n] = size(uk);
@@ -127,7 +127,7 @@ classdef MPCMHE_Tcalcutils
             Jcost = mpcQ*norm2(Tx(:,backwardHorizon+1:forwardHorizon)) + mpcR*norm2(control);
             Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(sensor_disturbance);
         end
-        function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
+        function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
             opt_properties = MPCMHE_properties;
             opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
                                                                 {Td, Tvback,Tx0}, ...
