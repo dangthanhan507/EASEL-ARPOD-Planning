@@ -124,7 +124,7 @@ classdef MPCMHE_Tcalcutils
             [meas_dim, backwardHorizon] = size(sensor_disturbance);
             [control_dim, forwardHorizon] = size(control);
 
-            Jcost = mpcQ*norm2(Tx(:,backwardHorizon+1:forwardHorizon)) + mpcR*norm2(control);
+            Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(control);
             Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(sensor_disturbance);
         end
         function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
@@ -151,7 +151,7 @@ classdef MPCMHE_Tcalcutils
             setV_x(opt, [window.window_mhestates, window.window_mpcstates]);
             setV_vback(opt, window.window_measError);
         end
-        function setupOptimizationVarsAtt(opt, window_attcontrols)
+        function setupOptimizationVarsAtt(opt, window)
             setP_attuback(opt, window.window_mhecontrols);
             setP_attypast(opt, window.window_measurements);
             setV_attu(opt, window.window_mpccontrols);
@@ -164,7 +164,7 @@ classdef MPCMHE_Tcalcutils
             [status,iter,time] = solve(opt,mu0,maxIter,saveIter);
 
             if use_attitude
-                [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(obj.opt);
+                [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(opt);
                 [measdim,backwardT] = size(vs);
                 attmheXs = attxs(:,1:backwardT);
                 attmpcXs = attxs(:,backwardT+1:end);
@@ -176,7 +176,7 @@ classdef MPCMHE_Tcalcutils
                 att_window.window_mpccontrols = attmpcUs; %TODO: FIX THIS
 
             else
-                [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(obj.opt); %get results
+                [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(opt); %get results
                 [measdim,backwardT] = size(vs);
 
             end

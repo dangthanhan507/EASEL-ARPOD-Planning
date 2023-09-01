@@ -10,7 +10,7 @@ function nothing = mpcmhe_main(mode)
     %Keep attitude = true
     use2D = false;
     useNonlinear = true;
-    useAttitude = false;
+    useAttitude = true;
     mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
     mhe_horizon = 10;
     total_time = 100; %total time in seconds
@@ -32,7 +32,7 @@ function nothing = mpcmhe_main(mode)
     if mode == 1
         disturbance = [0.03;0.03;0.03];
         disturbance_fn = @(u) disturbance + u;
-        
+
         mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
         mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
@@ -72,9 +72,11 @@ function nothing = mpcmhe_main(mode)
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     end
 
+    %TODO: remove 2d from code.
     mpcmhe = mpcmhe.createOptimization();
-    disp("paused")
-    pause
+    mpcmhe = mpcmhe.addAttitudeOptimization();
+    mpcmhe = mpcmhe.setupOptimizationVar();
+
 
     benchmark = ThrusterBenchmark;
     benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude);
@@ -89,15 +91,10 @@ function nothing = mpcmhe_main(mode)
     % traj0 = [1;1;0.001;0.001];
 
     % 3d w/ att
-    % noiseQ = @() [0;0;0;0;0;0];
-    % noiseR = @() [0;0;0;0;0;0];
-    % traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
-    %======================= NOISE END ========================
-
-    %3d no att
     noiseQ = @() [0;0;0;0;0;0];
     noiseR = @() [0;0;0;0;0;0];
-    traj0 = [10;10;10;0;0;0];
+    traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
+    %======================= NOISE END ========================
 
     benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance_fn, mpcmhe);
 

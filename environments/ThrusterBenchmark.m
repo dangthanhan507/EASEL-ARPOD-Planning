@@ -41,7 +41,7 @@ classdef ThrusterBenchmark
         true_att_trajs
         est_att_trajs
         att_controls
-        att_meas
+        att_measurements
 
 
         %save output of the controller per timestep
@@ -96,23 +96,16 @@ classdef ThrusterBenchmark
         end
         function [posTraj, attTraj] = decomposeTraj(obj, traj)
             if obj.use_attitude
-                if obj.use_2d
-                    % [x,y,yaw]
-                    % 1->2 pos, 3 att, 4->5 posdot, 6 attdot
-                    posTraj = [traj(1:2,:);traj(4:5,:)];
-                    attTraj = [traj(3,:);traj(6,:)];
-                else
-                    % [x,y,z,roll,pitch,yaw]
-                    % 1->3 pos, 4->6 att, 7->9 posdot, 10->12 attdot
-                    posTraj = [traj(1:3,:);traj(7:9,:)];
-                    attTraj = [traj(4:6,:);traj(10:12,:)];
-                end
+                % [x,y,z,roll,pitch,yaw]
+                % 1->3 pos, 4->6 att, 7->9 posdot, 10->12 attdot
+                posTraj = [traj(1:3,:);traj(7:9,:)];
+                attTraj = [traj(4:6,:);traj(10:12,:)];
             else
                 posTraj = traj;
                 attTraj = nargin;
             end
         end
-        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance_fn, MpcMheType)
+        function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance_fn, mpcmhe)
             %{
                 TODO: fill this docstring
                 Description:
@@ -135,13 +128,6 @@ classdef ThrusterBenchmark
             %}
 
 
-            % TODO: make this check work with attitude
-            % if obj.use_2d
-            %     [dim,n] = size(traj0);
-            %     if dim ~= 4
-            %         error("Non 2D Trajectory used");
-            %     end
-            % end
             [traj0,att0] = obj.decomposeTraj(traj0);
 
             %MISSION SETUP
@@ -150,17 +136,12 @@ classdef ThrusterBenchmark
             Mission = ARPOD_Mission;
             Mission = Mission.initMission(traj0, obj.tstep, obj.use_2d, 1);
             Mission = Mission.useAttitude(att0);
-
-            [A,B] = ARPOD_Dynamics.linearHCWDynamics(obj.tstep, Mission.mu, Mission.a, obj.use_2d);
-            [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(obj.tstep, obj.use_2d);
             %=====================
 
             
             %MPC-MHE setup
             %=====================
             %plug in state dim for measurement dim (we assume full state measurements)
-            mpcmhe = MpcMheType;
-
             if obj.use_2d
                 control_dim = 2;
                 attcontrol_dim = 1;
@@ -170,12 +151,6 @@ classdef ThrusterBenchmark
             end
             [state_dim,n] = size(traj0);
             [attstate_dim,n] = size(att0);
-            mpcmhe = mpcmhe.init(traj0, obj.mhe_horizon, obj.mpc_horizon, A, B, state_dim, control_dim);
-
-            if obj.use_attitude
-                mpcmhe = mpcmhe.initAtt(att0, Aatt, Batt, attcontrol_dim);
-            end
-            mpcmhe = mpcmhe.setupOptimize();
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
@@ -213,10 +188,10 @@ classdef ThrusterBenchmark
                     window_attcontrols(:,i/obj.tstep) = uatt;
                 end
             end
-            mpcmhe = mpcmhe.setupWindows(window_states, window_measurements, window_controls);
+            mpcmhe = mpcmhe.setupWindows(traj0, window_states, window_measurements, window_controls);
 
             if obj.use_attitude
-                mpcmhe = mpcmhe.setupAttWindows(window_attstates, window_attmeasurements, window_attcontrols);
+                mpcmhe = mpcmhe.setupAttWindows(att0, window_attstates, window_attmeasurements, window_attcontrols);
             end
             mpcmhe = mpcmhe.optimize();
 
@@ -258,16 +233,13 @@ classdef ThrusterBenchmark
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
                 Mission = Mission.nextStep(disturbance_fn(u),noiseQ,noiseR,true);
-                if obj.use_attitude
-                    Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
+                Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 
-                    att_meas = Mission.att_sensor;
-                    mpcmhe = mpcmhe.shiftAttitudeWindows(att_meas,uatt);
-                end
+                att_meas = Mission.att_sensor;
                 true_traj = Mission.traj;
                 meas = Mission.sensor;
 
-                mpcmhe = mpcmhe.shiftWindows(meas, u);
+                mpcmhe = mpcmhe.shift(meas, u, att_meas, uatt);
                 mpcmhe = mpcmhe.optimize();
                 u = mpcmhe.getMPCControl();
                 est_traj = mpcmhe.getMHEState();
@@ -280,7 +252,7 @@ classdef ThrusterBenchmark
                 obj.mpcXs{idx} = mpcXs;
                 obj.mpcUs{idx} = mpcUs;
                 if obj.use_attitude
-                    [mheXs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResultAttitude(obj)                    
+                    [mheXs, mheDs, mheVs, mpcXs, mpcUs] = mpcmhe.getOptimizeResultAttitude();               
                     uatt = mpcmhe.getMPCAttControl();
                     est_att_traj = mpcmhe.getMHEAttState();
 
@@ -290,7 +262,7 @@ classdef ThrusterBenchmark
                     obj.att_controls(:,idx) = uatt;
 
                     obj.mheXsAtt{idx} = mheXs;
-                    obj.mheDsAtt{idx} = mheDx;
+                    obj.mheDsAtt{idx} = mheDs;
                     obj.mheVsAtt{idx} = mheVs;
                     obj.mpcXsAtt{idx} = mpcXs;
                     obj.mpcUsAtt{idx} = mpcUs;

@@ -68,7 +68,7 @@ classdef MPCMHE
             obj.sensorConstraints = MPCMHE_Tcalcutils.createLinearSensorConstraint(C, obj.Tx, obj.Tvback, obj.Tyback, obj.backwardT);
         end
         function obj = setupSimpleObjective(obj, mpcQ, mpcR, mheQ, mheR)
-            obj.costFunction = MPCMHE_Tcalcutils.objectiveMPCMHE(mpcQ,mpcR,mheQ,mheR,obj.Tx, obj.Tuforward, obj.Td, obj.Tuforward);
+            obj.costFunction = MPCMHE_Tcalcutils.objectiveMPCMHE(mpcQ,mpcR,mheQ,mheR,obj.Tx, obj.Tuforward, obj.Td, obj.Tvback);
         end
         function obj = setupVariableLimits(obj, dMax, uMax, vMax)
             obj.dMax = dMax;
@@ -86,10 +86,11 @@ classdef MPCMHE
             obj.attsensorConstraints = MPCMHE_Tcalcutils.createLinearSensorConstraint(C, obj.attTx, obj.attTvback, obj.attTyback, obj.backwardT);
         end
         function obj = setupAttitudeCost(obj, mpcQ, mpcR, mheQ, mheR)
-            obj.attcostFunction = MPCMHE_Tcalcutils.objectiveMPCMHE(mpcQ,mpcR,mheQ,mheR,obj.attTx, obj.attTuforward, obj.attTd, obj.attTuforward);
+            obj.attcostFunction = MPCMHE_Tcalcutils.objectiveMPCMHE(mpcQ,mpcR,mheQ,mheR,obj.attTx, obj.attTuforward, obj.attTd, obj.attTvback);
         end
         function obj = addAttitudeOptimization(obj)
             other_properties = MPCMHE_Tcalcutils.setupOptimizationCells(obj.attcostFunction, obj.attdynamicConstraints, obj.attsensorConstraints,...
+                                                                        obj.dMax, obj.uMax, obj.vMax,...
                                                                         obj.attTx0, obj.attTx, obj.attTd, obj.attTuback, obj.attTyback, obj.attTvback,...
                                                                         obj.attTuforward);
             obj.opt_properties = obj.opt_properties.concat(other_properties);
@@ -117,20 +118,39 @@ classdef MPCMHE
         function obj = optimize(obj)
             %mutating void functions
             MPCMHE_Tcalcutils.setupOptimizationVarsTrans(obj.opt, obj.window);
-            MPCMHE_Tcalcutils.setupOptimizationVarsAtt(ob.opt, obj.att_window);
+            MPCMHE_Tcalcutils.setupOptimizationVarsAtt(obj.opt, obj.att_window);
 
             [obj.window, obj.att_window] = MPCMHE_Tcalcutils.mpcmhe_solve(obj.window, obj.att_window, obj.opt, 1, 500, -1, 1);
         end
-        function u = getControl(obj)
+        function [mheXs, mheDs, mheVs, mpcXs, mpcUs] = getOptimizeResult(obj)
+            mheXs = obj.window.window_mhestates;
+
+            mheDs = obj.window.window_controlDisturbances;
+            
+            mheVs = obj.window.window_measError;
+            
+            mpcUs = obj.window.window_mpccontrols;
+            
+            mpcXs = obj.window.window_mpcstates;
+            
+        end
+        function [mheXs, mheDs, mheVs, mpcXs, mpcUs] = getOptimizeResultAttitude(obj)
+            mheXs = obj.att_window.window_mhestates;
+            mheDs = obj.att_window.window_controlDisturbances;
+            mheVs = obj.att_window.window_measError;
+            mpcUs = obj.att_window.window_mpccontrols;
+            mpcXs = obj.att_window.window_mpcstates;
+        end
+        function u = getMPCControl(obj)
             u = obj.window.window_mpccontrols(:,1);
         end
-        function u = getAttControl(obj)
+        function u = getMPCAttControl(obj)
             u = obj.att_window.window_mpccontrols(:,1);
         end
-        function x = getState(obj)
+        function x = getMHEState(obj)
             x = obj.window.window_mhestates(:,end);
         end
-        function x = getAttState(obj)
+        function x = getMHEAttState(obj)
             x = obj.att_window.window_mhestates(:,end);
         end
         

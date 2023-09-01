@@ -7,7 +7,6 @@ classdef MPCMHE_windows
         window_mhestates
         window_mhecontrols
         window_measurements
-        window_pastcontrols
         window_controlDisturbances
         window_measError
 
@@ -43,7 +42,7 @@ classdef MPCMHE_windows
                 obj.window_controlDisturbances = [eye(control_dim,control_dim). zeros(control_dim,1)];
             end
 
-            obj.window_measError = zeros(meas_dim, obj.backwardT);
+            obj.window_measError = zeros(meas_dim, backwardT);
 
             %setup mpc windows
             obj.window_mpccontrols = zeros(control_dim, forwardT);
@@ -81,6 +80,7 @@ classdef MPCMHE_windows
             obj.window_measurements = [obj.window_measurements(:,2:end), measurement];
 
             if obj.disturbType == 0
+                [control_dim, backwardT] = size(obj.window_mhecontrols);
                 obj.window_controlDisturbances = zeros(control_dim,1);
             elseif obj.disturbType == 1
                 obj.window_controlDisturbances = [obj.window_controlDisturbances(:,2:end), obj.window_controlDisturbances(:,end)];
