@@ -1,4 +1,4 @@
-function nothing = mpcmhe_main(mode)
+function benchmark = mpcmhe_main(mode)
     delete("tmpC*") %delete any temporary files created
     close all
     clc
@@ -11,9 +11,9 @@ function nothing = mpcmhe_main(mode)
     use2D = false;
     useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-    mhe_horizon = 10;
-    total_time = 100; %total time in seconds
+    mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mhe_horizon = 5;
+    total_time = 30+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
     state_dim = 6;
