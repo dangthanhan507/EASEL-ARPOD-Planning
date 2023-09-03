@@ -11,16 +11,15 @@ function benchmark = mpcmhe_6dof_main(mode)
     use2D = false;
     useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-    mhe_horizon = 3;
-    total_time = 30+mhe_horizon; %total time in seconds + setup time
+    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mhe_horizon = 10;
+    total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
     state_dim = 6;
     meas_dim = 6;
     control_dim = 6;
     att_dim = 6;
-    att_control_dim = 3;
     
     mpcmhe = MPCMHE_6dof;
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
@@ -34,9 +33,9 @@ function benchmark = mpcmhe_6dof_main(mode)
         disturbance = zeros(6,1);
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.5);
+        mpcmhe = mpcmhe.setupSimpleObjective(1e2,1,1,1e3);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
+        mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.5);
     elseif mode == 2
         disturbance = [0.03;0.03;0.03];
         disturbance_fn = @(u) disturbance + u;

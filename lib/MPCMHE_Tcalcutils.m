@@ -62,7 +62,7 @@ classdef MPCMHE_Tcalcutils
                 --------
             %}
 
-            xk = [Tx0, Tx(:,1:end-1)];  
+            xk = [Tx0, Tx(:,1:end-1)];
             uk = [uback, uforward];
 
             [control_dim, n] = size(uk);
@@ -178,15 +178,23 @@ classdef MPCMHE_Tcalcutils
             else
                 [Jcost, mpcUs, mheDs, x0s, xs, vs] = getOutputs(opt); %get results
                 [measdim,backwardT] = size(vs);
-
             end
             mheXs = xs(:,1:backwardT);
             mpcXs = xs(:,backwardT+1:end);
+
+            disp("Jcost:")
+            disp(Jcost)
+
             window.window_controlDisturbances = mheDs;
             window.window_measError = vs;
             window.window_mhestates = mheXs;
             window.window_mpcstates = mpcXs;
             window.window_mpccontrols = mpcUs;
+
+            disp("MPC Future")
+            disp(window.window_mpcstates)
+            disp("MPC control horizon")
+            disp(window.window_mpccontrols)
         end
     end
 end

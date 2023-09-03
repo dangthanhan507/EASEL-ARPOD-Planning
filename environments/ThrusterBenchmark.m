@@ -222,8 +222,8 @@ classdef ThrusterBenchmark
                 true_traj = Mission.traj;
                 meas = Mission.sensor;
 
-                disp(u);
-                disp(meas);
+                % disp(u);
+                % disp(meas);
 
                 mpcmhe = mpcmhe.shift(meas, u, att_meas, uatt);
                 mpcmhe = mpcmhe.optimize();
