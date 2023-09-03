@@ -220,7 +220,7 @@ classdef ThrusterBenchmark
             if obj.use_attitude
                 obj.true_att_trajs  = zeros(attstate_dim, num_steps);
                 obj.est_att_trajs   = zeros(attstate_dim, num_steps);
-                obj.att_meas        = zeros(attstate_dim, num_steps);
+                obj.att_measurements        = zeros(attstate_dim, num_steps);
                 obj.att_controls    = zeros(attcontrol_dim, num_steps);
 
                 obj.mheXsAtt           = cell(num_steps);
@@ -258,7 +258,7 @@ classdef ThrusterBenchmark
 
                     obj.true_att_trajs(:,idx) = Mission.att;
                     obj.est_att_trajs(:,idx) = est_att_traj;
-                    obj.att_meas(:,idx) = att_meas;
+                    obj.att_measurements(:,idx) = att_meas;
                     obj.att_controls(:,idx) = uatt;
 
                     obj.mheXsAtt{idx} = mheXs;
