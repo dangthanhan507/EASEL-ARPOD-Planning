@@ -1,24 +1,9 @@
 classdef MPCMHE_6dofutils
     methods (Static)
-        function dynamicConstraints = createFixedLTIConstraints(A, B, Tx0, Tx, uback, uforward, disturbance, disturbType)
-            % 6dof vs normal spacecraft
-            %{
-                u is 6x1
-                [ 1 -1  0  0  0  0] [ux+]
-                [ 0  0  1 -1  0  0] [ux-]    [ux]
-                [ 0  0  0  0  1 -1] [uy+]  = [uy]
-                                    [uy-]    [uz]
-                                    [uz+]
-                                    [uz-]
-            %}
-            D = [1, -1,  0,  0,  0,  0;
-                 0,  0,  1, -1,  0,  0;
-                 0,  0,  0,  0,  1, -1];
-            
+        function dynamicConstraints = createFixedBodyLTIDynamics(A, B, Tx0, Tx, uback, uforward, disturbance, disturbType)
+
             xk = [Tx0, Tx(:,1:end-1)];  
             uk = [uback, uforward];
-
-            uk = D*uk; %now 3xN
 
             [control_dim, n] = size(uk);
             if disturbType == 0
@@ -46,7 +31,21 @@ classdef MPCMHE_6dofutils
                     uk(:,i) = dMatrix*uk(:,i) + dAdd;
                 end
             end
-            dynamicConstraints = (Tx == A*xk + B*uk);
+
+            % 6dof vs normal spacecraft
+            %{
+                u is 6x1
+                [ 1 -1  0  0  0  0] [ux+]
+                [ 0  0  1 -1  0  0] [ux-]    [ux]
+                [ 0  0  0  0  1 -1] [uy+]  = [uy]
+                                    [uy-]    [uz]
+                                    [uz+]
+                                    [uz-]
+            %}
+            D = [1, -1,  0,  0,  0,  0;
+                 0,  0,  1, -1,  0,  0;
+                 0,  0,  0,  0,  1, -1];
+            dynamicConstraints = (Tx == A*xk + B*D*uk);
         end
         function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
             %only difference is we set uMin to zero

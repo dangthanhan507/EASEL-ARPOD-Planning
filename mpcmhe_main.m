@@ -79,7 +79,7 @@ function benchmark = mpcmhe_main(mode)
 
 
     benchmark = ThrusterBenchmark;
-    benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude);
+    benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, false, useAttitude);
     %{
         The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
     %}

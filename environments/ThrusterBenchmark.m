@@ -28,7 +28,6 @@ classdef ThrusterBenchmark
         %simulation options
         use_nonlinear
         use_attitude
-        use_2d
 
 
         %benchmark save data
@@ -57,9 +56,11 @@ classdef ThrusterBenchmark
         mpcXsAtt
         mpcUsAtt
 
+        thruster6dof
+
     end
     methods 
-        function obj = init(obj, useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, use2D, useAttitude)
+        function obj = init(obj, useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, thruster6dof, useAttitude)
             %{
                 Description:
                 ------------
@@ -72,18 +73,17 @@ classdef ThrusterBenchmark
                 @params mpc_horizon
                 @params total_time
                 @params tstep
-                @params use2D
                 @params useAttitude
 
                 Returns:
                 --------
                 Class instance with the parameters we want to start benchmark.
             %}
+            obj.thruster6dof = thruster6dof;
 
             %set simulation options
             obj.use_nonlinear = useNonlinear;
             obj.use_attitude = useAttitude;
-            obj.use_2d = use2D;
 
             %set simulation parameters
             obj.total_time = total_time;
@@ -134,7 +134,7 @@ classdef ThrusterBenchmark
             %=====================
             %hard-coded thruster type
             Mission = ARPOD_Mission;
-            Mission = Mission.initMission(traj0, obj.tstep, obj.use_2d, 1);
+            Mission = Mission.initMission(traj0, obj.tstep, false, 1);
             Mission = Mission.useAttitude(att0);
             %=====================
 
@@ -142,13 +142,12 @@ classdef ThrusterBenchmark
             %MPC-MHE setup
             %=====================
             %plug in state dim for measurement dim (we assume full state measurements)
-            if obj.use_2d
-                control_dim = 2;
-                attcontrol_dim = 1;
+            if obj.thruster6dof
+                control_dim = 6;
             else
                 control_dim = 3;
-                attcontrol_dim = 3;
             end
+            attcontrol_dim = 3;
             [state_dim,n] = size(traj0);
             [attstate_dim,n] = size(att0);
 
