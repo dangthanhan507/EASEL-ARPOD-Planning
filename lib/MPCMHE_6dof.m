@@ -18,9 +18,5 @@ classdef MPCMHE_6dof < MPCMHE
                                                         obj.Tx0, obj.Tx, obj.Td, obj.Tuback, obj.Tyback, obj.Tvback,...
                                                         obj.Tuforward);
         end
-        function u = getMPCControl(obj)
-            u = obj.window.window_mpccontrols(:,1);
-            u = obj.uMat*u;
-        end
     end
 end

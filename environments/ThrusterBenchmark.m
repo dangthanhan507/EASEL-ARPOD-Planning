@@ -106,28 +106,6 @@ classdef ThrusterBenchmark
             end
         end
         function obj = runBenchmark(obj, traj0, noiseQ, noiseR, disturbance_fn, mpcmhe)
-            %{
-                TODO: fill this docstring
-                Description:
-                ------------
-
-                Parameters:
-                -----------
-                @params traj0
-                @params noiseQ
-                @params noiseR
-                @params disturbance
-
-
-                Returns:
-                --------
-
-                NOTES:
-                ---------
-                traj0 should contain both position and attitude and velocity of both too
-            %}
-
-
             [traj0,att0] = obj.decomposeTraj(traj0);
 
             %MISSION SETUP
@@ -169,8 +147,14 @@ classdef ThrusterBenchmark
 
             noiseQatt = @() zeros(length(att0),1);
             noiseRatt = @() zeros(length(att0),1);
+
+            if obj.thruster6dof
+                uMat = mpcmhe.uMat;
+            else
+                uMat = eye(3);
+            end
             for i = obj.tstep:obj.tstep:obj.mhe_horizon % [tstep -> obj.mhe_horizon] inclusive steps by tstep
-                Mission = Mission.nextStep(u,noiseQ,noiseR,true);
+                Mission = Mission.nextStep(uMat*u,noiseQ,noiseR,true);
                 if obj.use_attitude
                     Mission = Mission.nextAttStep(uatt, noiseQatt, noiseRatt);
                 end
@@ -227,16 +211,19 @@ classdef ThrusterBenchmark
                 obj.mheVsAtt           = cell(num_steps);
                 obj.mpcXsAtt           = cell(num_steps);
                 obj.mpcUsAtt           = cell(num_steps);
-            end    
+            end
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
-                Mission = Mission.nextStep(disturbance_fn(u),noiseQ,noiseR,true);
+                Mission = Mission.nextStep(uMat*disturbance_fn(u),noiseQ,noiseR,true);
                 Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 
                 att_meas = Mission.att_sensor;
                 true_traj = Mission.traj;
                 meas = Mission.sensor;
+
+                disp(u);
+                disp(meas);
 
                 mpcmhe = mpcmhe.shift(meas, u, att_meas, uatt);
                 mpcmhe = mpcmhe.optimize();
@@ -266,9 +253,6 @@ classdef ThrusterBenchmark
                     obj.mpcXsAtt{idx} = mpcXs;
                     obj.mpcUsAtt{idx} = mpcUs;
                 end
-
-
-
                 
                 obj.true_trajs(:,idx) = true_traj;
                 obj.estimated_trajs(:,idx) = est_traj;

@@ -45,7 +45,7 @@ classdef MPCMHE_6dofutils
             D = [1, -1,  0,  0,  0,  0;
                  0,  0,  1, -1,  0,  0;
                  0,  0,  0,  0,  1, -1];
-            dynamicConstraints = (Tx == A*xk + B*D*uk);
+            dynamicConstraints = (Tx == A*xk + (B*D)*uk);
         end
         function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
             %only difference is we set uMin to zero
