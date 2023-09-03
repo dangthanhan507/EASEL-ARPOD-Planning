@@ -1,9 +1,24 @@
 classdef MPCMHE_6dofutils
     methods (Static)
-        function dynamicConstraints = createFixedBodyDynamicConstraints(A, B, Tx0, Tx, uback, uforward, disturbance, disturbType)
-
+        function dynamicConstraints = createFixedLTIConstraints(A, B, Tx0, Tx, uback, uforward, disturbance, disturbType)
+            % 6dof vs normal spacecraft
+            %{
+                u is 6x1
+                [ 1 -1  0  0  0  0] [ux+]
+                [ 0  0  1 -1  0  0] [ux-]    [ux]
+                [ 0  0  0  0  1 -1] [uy+]  = [uy]
+                                    [uy-]    [uz]
+                                    [uz+]
+                                    [uz-]
+            %}
+            D = [1, -1,  0,  0,  0,  0;
+                 0,  0,  1, -1,  0,  0;
+                 0,  0,  0,  0,  1, -1];
+            
             xk = [Tx0, Tx(:,1:end-1)];  
             uk = [uback, uforward];
+
+            uk = D*uk; %now 3xN
 
             [control_dim, n] = size(uk);
             if disturbType == 0
@@ -31,9 +46,21 @@ classdef MPCMHE_6dofutils
                     uk(:,i) = dMatrix*uk(:,i) + dAdd;
                 end
             end
-
-            %setup 
-            dynamicConstraints = (Tx == A*xk + B*uk)
+            dynamicConstraints = (Tx == A*xk + B*uk);
+        end
+        function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
+            %only difference is we set uMin to zero
+            opt_properties = MPCMHE_properties;
+            opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
+                                                                {Td, Tvback,Tx0}, ...
+                                                                {Tx},...
+                                                                {Tuforward <= uMax*Tones(size(Tuforward)), Tuforward >= 0*Tones(size(Tuforward))},...
+                                                                {Td<=dMax*Tones(size(Td)), Td>=-dMax*Tones(size(Td)),...
+                                                                    Tvback<=vMax*Tones(size(Tvback)), Tvback>=-vMax*Tones(size(Tvback)),...
+                                                                    sensorConstraints},...
+                                                                {dynamicConstraints},...
+                                                                {Tuforward,Td,Tx0,Tx,Tvback},...
+                                                                {Tuback,Tyback});
         end
     end
 end
