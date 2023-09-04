@@ -30,19 +30,22 @@ function benchmark = mpcmhe_6dof_main(mode)
     
     if mode == 1
         % disturbance = [0.03;0.03;0.03];
-        disturbance = zeros(6,1);
+        disturbance = 0.03*ones(6,1);
         disturbance_fn = @(u) disturbance + u;
 
         mpcmhe = mpcmhe.setupSimpleObjective(1e2,1,1,1e3);
         mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
-        mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.5);
+        mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.2);
     elseif mode == 2
-        disturbance = [0.03;0.03;0.03];
+        disturbance = 0.01*ones(6,1);
+        disturbance(2) = 0;
+        disturbance(4) = 0;
+        disturbance(6) = 0;
         disturbance_fn = @(u) disturbance + u;
 
         mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1e3);
+        mpcmhe = mpcmhe.setupVariableLimits(0.03,0.1,0.5);
     elseif mode == 3
         disturbance = eye(3);
 
