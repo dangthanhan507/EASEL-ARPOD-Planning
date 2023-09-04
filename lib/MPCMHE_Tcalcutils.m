@@ -161,7 +161,7 @@ classdef MPCMHE_Tcalcutils
             setV_attvback(opt, window.window_measError);
         end
         function [window,att_window] = mpcmhe_solve(window, att_window, opt, mu0, maxIter, saveIter, use_attitude)
-            [status,iter,time] = solve(opt,mu0,maxIter,saveIter);
+            [status,iter,time] = solve(opt,mu0,int32(maxIter),int32(saveIter));
 
             if use_attitude
                 [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(opt);

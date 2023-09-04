@@ -1,5 +1,6 @@
 function benchmark = mpcmhe_6dof_main(mode)
     delete("tmpC*") %delete any temporary files created
+    delete("@tmpC*") %delete any temporary files created
     close all
     clc
     %fixes randomness for reproducibility of any plots
@@ -11,8 +12,8 @@ function benchmark = mpcmhe_6dof_main(mode)
     use2D = false;
     useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-    mhe_horizon = 10;
+    mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mhe_horizon = 5;
     total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
@@ -25,7 +26,7 @@ function benchmark = mpcmhe_6dof_main(mode)
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
     [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
-    mpcmhe = mpcmhe.setupLTICoupled(A,B,eye(state_dim));
+    mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim));
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
     if mode == 1

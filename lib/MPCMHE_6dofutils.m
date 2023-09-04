@@ -10,9 +10,9 @@ classdef MPCMHE_6dofutils
                 %leave empty
             elseif disturbType == 1
                 %time-varying additive
-                % for i = 1:n
-                %     uk(:,i) = uk(:,i) + disturbance(:,i);
-                % end
+                for i = 1:n
+                    uk(:,i) = uk(:,i) + disturbance(:,i);
+                end
             elseif disturbType == 2
                 %time-invariant additive
                 for i = 1:n
