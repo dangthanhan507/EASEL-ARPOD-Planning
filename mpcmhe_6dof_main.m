@@ -25,7 +25,7 @@ function benchmark = mpcmhe_6dof_main(mode)
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
     [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
-    mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim));
+    mpcmhe = mpcmhe.setupLTICoupled(A,B,eye(state_dim));
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
     if mode == 1
@@ -43,12 +43,12 @@ function benchmark = mpcmhe_6dof_main(mode)
         disturbance(6) = 0;
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1e3);
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1e3);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(0.03,0.1,0.5);
     elseif mode == 3
-        disturbance = eye(3);
-
+        disturbance = eye(6);
+        disturbance_fn = @(u) disturbance*u;
         % a = 0;
         % b = pi/3;
         % c = -pi/3;
@@ -57,13 +57,15 @@ function benchmark = mpcmhe_6dof_main(mode)
         % Rz = [cos(c) -sin(c) 0; sin(c) cos(c) 0; 0 0 1];
         % disturbance = Rz*Ry*Rx;
 
-        % disturbance = [0,1,0;
-        %             0,0,1;
-        %             1,0,0];
-        disturbance_fn = @(u) disturbance*u;
+        % disturbance_fn = @(u)  [disturbance(1,:)*u(1:2:6); 
+        %                         disturbance(1,:)*u(2:2:6);
+        %                         disturbance(2,:)*u(1:2:6);
+        %                         disturbance(2,:)*u(2:2:6);
+        %                         disturbance(3,:)*u(1:2:6);
+        %                         disturbance(3,:)*u(2:2:6)];
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupSimpleObjective(1e3,1,1,1e3);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     else
         %Time invariant matrix transform and additive disturbance on control vector
