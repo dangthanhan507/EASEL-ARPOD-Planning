@@ -266,5 +266,29 @@ classdef MPCMHE_Tcalcutils
             disp("MPC control horizon")
             disp(window.window_mpccontrols)
         end
+        
+        %{
+            arctan function for MHE
+        %}
+        function z_t = Sensing(state)
+            x = state(1,:);
+            y = state(2,:);
+            z = state(3,:);
+        
+            norm = sqrt(x.*x+y.*y+z.*z);
+            e1 = atan(y ./ x);
+            z_norm = z ./ norm;
+            e2 = atan( z_norm ./ sqrt((1+z_norm)*(1-z_norm)));
+            e3 = norm;
+            z_t = [e1;e2;e3];
+        end
+        function gX = applyNonlinearSensor(Tstates)
+            [state_dim, num] = size(Tstates);
+            gX = Tzeros(size(Tstates));
+            for i = 1:num
+                gX(:,i) = MPCMHE_Tcalcutils.Sensing(Tstates(:,i));
+            end
+            %return sensor version of everything
+        end
     end
 end

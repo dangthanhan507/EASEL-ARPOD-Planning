@@ -63,23 +63,6 @@ classdef MPCMHE_6dofutils
                                                                 {Tuforward,Td,Tx0,Tx,Tvback},...
                                                                 {Tuback,Tyback});
         end
-
-        %{
-            arctan function for MHE
-        %}
-        function z_t = Sensing(state)
-            x = state(1,:);
-            y = state(2,:);
-            z = state(3,:);
-        
-            norm = sqrt(x.*x+y.*y+z.*z);
-            e1 = atan(y ./ x);
-            %e2 = asin(z/norm);
-            z_norm = z ./ norm;
-            e2 = atan( z_norm ./ sqrt((1+z_norm)*(1-z_norm)));
-            e3 = norm;
-            z_t = [e1;e2;e3];
-        end
         
 
         %======== Adding Rotation =============
