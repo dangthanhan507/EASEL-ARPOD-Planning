@@ -290,5 +290,42 @@ classdef MPCMHE_Tcalcutils
             end
             %return sensor version of everything
         end
+        function measurementConstraints = createNonlinearSensorConstraint(Tx, sensorDisturb, measurements, backwardHorizon)
+            measurementConstraints = (measurements == MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) + sensorDisturb);
+        end
+        function Jcost = objectiveUnconstrainedMPCMHENonlinearMeas(A, B, mpcQ, mpcR, mheQ, mheR, Tx, uBack, uForward, meas, disturbance, sensor_disturbance, disturbType)
+            [meas_dim, backwardHorizon] = size(sensor_disturbance);
+            [control_dim, forwardHorizon] = size(uForward);
+
+            uk = uBack;
+            n = backwardHorizon-1;
+            if disturbType == 0
+            elseif disturbType == 1
+                %time-varying additive
+                for i = 1:n
+                    uk(:,i) = uk(:,i) + disturbance(:,i);
+                end
+            elseif disturbType == 2
+                %time-invariant additive
+                for i = 1:n
+                    uk(:,i) = uk(:,i) + disturbance;
+                end
+            elseif disturbType == 3
+                %time-invariant matrix transform
+                for i = 1:n
+                    uk(:,i) = disturbance*uk(:,i);
+                end
+            else
+                %time-invariant matrix transform + additive
+                dMatrix = disturbance(1:control_dim, 1:control_dim);
+                dAdd    = disturbance(1:control_dim, end);
+                for i = 1:n
+                    uk(:,i) = dMatrix*uk(:,i) + dAdd;
+                end
+            end
+            xk = [Tx0, Tx(:,1:backwardHorizon-1)];
+            Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
+            Jcost = Jcost - mheQ*norm2(Tx(:,1:backwardHorizon) - (A*xk + B*uk)) - mheR*norm2(meas - ( MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) + sensor_disturbance));
+        end
     end
 end
