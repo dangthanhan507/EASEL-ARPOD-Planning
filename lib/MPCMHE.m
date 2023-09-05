@@ -63,6 +63,11 @@ classdef MPCMHE
         end
 
         %%%% TENSCALC SETUP OPTIMIZATION CODE BEGIN %%%%
+        function obj = setupUnconstrainedFixedBody(obj, A, B, C, mpcQ, mpcR, mheQ, mheR)
+            %runs objective and constraint at once
+            obj.dynamicConstraints = MPCMHE_Tcalcutils.createLTIDynamicConstraintsMPC(A,B,obj.Tx, obj.Tuforward, obj.Td, obj.disturbType);
+            obj.costFunction       = MPCMHE_Tcalcutils.objectiveUnconstrainedMPCMHE(A,B,C, mpcQ, mpcR, mheQ, mheR, obj.Tx, obj.Tuback, obj.Tuforward, obj.Tyback, obj.Td, obj.disturbType);
+        end
         function obj = setupLTILinearFixedBody(obj, A, B, C)
             obj.dynamicConstraints = MPCMHE_Tcalcutils.createLTIDynamicConstraints(A,B,obj.Tx0, obj.Tx, obj.Tuback, obj.Tuforward, obj.Td, obj.disturbType);
             obj.sensorConstraints = MPCMHE_Tcalcutils.createLinearSensorConstraint(C, obj.Tx, obj.Tvback, obj.Tyback, obj.backwardT);
