@@ -106,6 +106,7 @@ classdef MPCMHE_Tcalcutils
 
             n = forwardT;
             if disturbType == 0
+                %nothing
             elseif disturbType == 1
                 %time-varying additive
                 for i = 1:n
@@ -162,41 +163,34 @@ classdef MPCMHE_Tcalcutils
             Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(control);
             Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(sensor_disturbance);
         end
-        function Jcost = objectiveUnconstrainedMPCMHE(A, B, C, mpcQ, mpcR, mheQ, mheR, Tx, uBack, uForward, meas, disturbance, sensor_disturbance, disturbType)
+        function Jcost = objectiveUnconstrainedMPCMHE(A, B, C, mpcQ, mpcR, mheQ, mheR, Tx0, Tx, uBack, uForward, meas, disturbance, sensor_disturbance, disturbType)
+            %{
+                NOTE:
+                    latent variable must have equal number of equality constraints...
+                    this prevents us from using fully unconstrained MHE.
+
+                    we thus only move the sensor constraints up to objective
+                    and keep the dynamics as a constraint.
+            %}
             [meas_dim, backwardHorizon] = size(sensor_disturbance);
             [control_dim, forwardHorizon] = size(uForward);
 
-            uk = uBack;
-            n = backwardHorizon-1;
-            if disturbType == 0
-            elseif disturbType == 1
-                %time-varying additive
-                for i = 1:n
-                    uk(:,i) = uk(:,i) + disturbance(:,i);
-                end
-            elseif disturbType == 2
-                %time-invariant additive
-                for i = 1:n
-                    uk(:,i) = uk(:,i) + disturbance;
-                end
-            elseif disturbType == 3
-                %time-invariant matrix transform
-                for i = 1:n
-                    uk(:,i) = disturbance*uk(:,i);
-                end
-            else
-                %time-invariant matrix transform + additive
-                dMatrix = disturbance(1:control_dim, 1:control_dim);
-                dAdd    = disturbance(1:control_dim, end);
-                for i = 1:n
-                    uk(:,i) = dMatrix*uk(:,i) + dAdd;
-                end
-            end
-            xk = [Tx0, Tx(:,1:backwardHorizon-1)];
             Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
-            Jcost = Jcost - mheQ*norm2(Tx(:,1:backwardHorizon) - (A*xk + B*uk)) - mheR*norm2(meas - (C*Tx(:,1:backwardHorizon) + sensor_disturbance));
+            Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(meas - (C*Tx(:,1:backwardHorizon)));
         end
 
+        function opt_properties = setupUnconstrainedOptimizationCells(costFunction, dynamicConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
+            opt_properties = MPCMHE_properties;
+            opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
+                                                                {Td, Tvback,Tx0}, ...
+                                                                {Tx},...
+                                                                {Tuforward <= uMax*Tones(size(Tuforward)), Tuforward >= -uMax*Tones(size(Tuforward))},...
+                                                                {Td<=dMax*Tones(size(Td)), Td>=-dMax*Tones(size(Td)),...
+                                                                    Tvback<=vMax*Tones(size(Tvback)), Tvback>=-vMax*Tones(size(Tvback))},...
+                                                                {dynamicConstraints},...
+                                                                {Tuforward,Td,Tx0,Tx,Tvback},...
+                                                                {Tuback,Tyback});
+        end
         function opt_properties = setupOptimizationCells(costFunction, dynamicConstraints, sensorConstraints, dMax, uMax, vMax, Tx0, Tx, Td, Tuback, Tyback, Tvback, Tuforward)
             opt_properties = MPCMHE_properties;
             opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
@@ -211,7 +205,6 @@ classdef MPCMHE_Tcalcutils
                                                                 {Tuback,Tyback});
         end
         function setupOptimizationVarsTrans(opt, window)
-
             %setting translation stuff
             setP_uback(opt, window.window_mhecontrols);
             setP_ypast(opt, window.window_measurements);
@@ -325,7 +318,7 @@ classdef MPCMHE_Tcalcutils
             end
             xk = [Tx0, Tx(:,1:backwardHorizon-1)];
             Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
-            Jcost = Jcost - mheQ*norm2(Tx(:,1:backwardHorizon) - (A*xk + B*uk)) - mheR*norm2(meas - ( MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) + sensor_disturbance));
+            Jcost = Jcost - mheQ*norm2(Tx(:,1:backwardHorizon) - (A*xk + B*uk)) - mheR*norm2(meas - ( MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) + sensor_disturbance) );
         end
     end
 end

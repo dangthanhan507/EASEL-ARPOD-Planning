@@ -11,7 +11,7 @@ function benchmark = mpcmhe_main(mode)
     use2D = false;
     useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mpc_horizon = 15; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
     mhe_horizon = 10;
     total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
@@ -25,7 +25,6 @@ function benchmark = mpcmhe_main(mode)
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
     [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
-    mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim));
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
     if mode == 1
@@ -33,16 +32,18 @@ function benchmark = mpcmhe_main(mode)
         disturbance = zeros(3,1);
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,1,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
+
         mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.05);
+        % mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim),1e3,1,1,1);
+        mpcmhe = mpcmhe.setupUnconstrainedFixedBody(A,B,eye(state_dim), 1e3, 1, 1, 1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
     elseif mode == 2
         disturbance = [0.03;0.03;0.03];
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+        mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim),1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
     elseif mode == 3
         disturbance = eye(3);
 
@@ -59,21 +60,18 @@ function benchmark = mpcmhe_main(mode)
         %             1,0,0];
         disturbance_fn = @(u) disturbance*u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+        mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim),1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
     else
         %Time invariant matrix transform and additive disturbance on control vector
         disturbanceD = eye(3);
         disturbanced = zeros(3,1);
         disturbance_fn = @(u) disturbanceD*u + disturbanced;
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+        mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim),1e3,10,1,1);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
     end
-
-    %TODO: remove 2d from code.
-    mpcmhe = mpcmhe.createOptimization();
     mpcmhe = mpcmhe.addAttitudeOptimization();
     mpcmhe = mpcmhe.setupOptimizationVar();
 
