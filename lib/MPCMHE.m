@@ -133,7 +133,7 @@ classdef MPCMHE
             MPCMHE_Tcalcutils.setupOptimizationVarsTrans(obj.opt, obj.window);
             MPCMHE_Tcalcutils.setupOptimizationVarsAtt(obj.opt, obj.att_window);
 
-            [obj.window, obj.att_window] = MPCMHE_Tcalcutils.mpcmhe_solve(obj.window, obj.att_window, obj.opt, 1, 1000, -1, 1);
+            [obj.window, obj.att_window] = MPCMHE_Tcalcutils.mpcmhe_solve(obj.window, obj.att_window, obj.opt, 1, 2000, -1, 1);
         end
         function [mheXs, mheDs, mheVs, mpcXs, mpcUs] = getOptimizeResult(obj)
             mheXs = obj.window.window_mhestates;

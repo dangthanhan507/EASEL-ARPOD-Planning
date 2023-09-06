@@ -56,9 +56,9 @@ classdef MPCMHE_properties
             %set hyperparams by default
             obj.muAggressive = 0.5;
             obj.muConservative = 0.99;
-            obj.targetDualityGap = 0.1;
-            obj.maxIter = 500;
-            obj.gradientTolerance = 1e-3;
+            obj.targetDualityGap = 0.3;
+            obj.maxIter = 2000;
+            obj.gradientTolerance = 1e-2;
             obj.delta = 2;
             obj.compilerFlags = '-O1';
             obj.allowSave = true;

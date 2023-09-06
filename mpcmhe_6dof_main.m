@@ -18,25 +18,30 @@ function benchmark = mpcmhe_6dof_main(mode)
     tstep = 1;        %each time step is 1 second
 
     state_dim = 6;
-    meas_dim = 6;
     control_dim = 6;
     att_dim = 6;
     
+    if useNonlinear == true
+        meas_dim = 3;
+    else
+        meas_dim = 6;
+    end
+
     mpcmhe = MPCMHE_6dof;
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
     [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
-    mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim));
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
     if mode == 1
-        % disturbance = [0.03;0.03;0.03];
         disturbance = 0.03*ones(6,1);
+        % disturbance = 0*ones(6,1);
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e2,1,1,1e3);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.2);
+        % mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
+        mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e2,1,1e6,1e6);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
     elseif mode == 2
         disturbance = 0.01*ones(6,1);
         disturbance(2) = 0;
@@ -44,9 +49,9 @@ function benchmark = mpcmhe_6dof_main(mode)
         disturbance(6) = 0;
         disturbance_fn = @(u) disturbance + u;
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1e3);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(0.03,0.1,0.5);
+        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
     elseif mode == 3
         disturbance = eye(6);
         disturbance_fn = @(u) disturbance*u;
@@ -65,21 +70,19 @@ function benchmark = mpcmhe_6dof_main(mode)
         %                         disturbance(3,:)*u(1:2:6);
         %                         disturbance(3,:)*u(2:2:6)];
 
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,1,1,1e3);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
+        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
+        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
     else
         %Time invariant matrix transform and additive disturbance on control vector
         disturbanceD = eye(3);
         disturbanced = zeros(3,1);
         disturbance_fn = @(u) disturbanceD*u + disturbanced;
-        mpcmhe = mpcmhe.setupSimpleObjective(1e3,10,1,1);
+        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
         mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
         mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
     end
 
-    %TODO: remove 2d from code.
-    mpcmhe = mpcmhe.createOptimization();
     mpcmhe = mpcmhe.addAttitudeOptimization();
     mpcmhe = mpcmhe.setupOptimizationVar();
 
@@ -93,7 +96,8 @@ function benchmark = mpcmhe_6dof_main(mode)
 
     % 3d w/ att
     noiseQ = @() [0;0;0;0;0;0];
-    noiseR = @() [0;0;0;0;0;0];
+    % noiseR = @() [0;0;0;0;0;0];
+    noiseR = @() [0;0;0];
     traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
     %======================= NOISE END ========================
 
