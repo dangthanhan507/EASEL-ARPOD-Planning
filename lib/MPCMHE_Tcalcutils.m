@@ -4,7 +4,7 @@ classdef MPCMHE_Tcalcutils
             Tvariable x0a   [statedim,1];
             Tvariable x     [statedim, backHorizon + forwardHorizon];
             Tvariable uback [controldim, backHorizon];
-            Tvariable vback [statedim, backHorizon];
+            Tvariable vback [meas_dim, backHorizon];
             Tvariable ypast [meas_dim, backHorizon];
             Tvariable u     [controldim, forwardHorizon];
 
@@ -273,11 +273,14 @@ classdef MPCMHE_Tcalcutils
             z_norm = z ./ norm;
             e2 = atan( z_norm ./ sqrt((1+z_norm)*(1-z_norm)));
             e3 = norm;
-            z_t = [e1;e2;e3];
+            z_t = Tones(3,1);
+            z_t(1,:) = e1;
+            z_t(2,:) = e2;
+            z_t(3,:) = e3;
         end
         function gX = applyNonlinearSensor(Tstates)
             [state_dim, num] = size(Tstates);
-            gX = Tzeros(size(Tstates));
+            gX = Tzeros(3,num);
             for i = 1:num
                 gX(:,i) = MPCMHE_Tcalcutils.Sensing(Tstates(:,i));
             end
@@ -289,36 +292,9 @@ classdef MPCMHE_Tcalcutils
         function Jcost = objectiveUnconstrainedMPCMHENonlinearMeas(A, B, mpcQ, mpcR, mheQ, mheR, Tx, uBack, uForward, meas, disturbance, sensor_disturbance, disturbType)
             [meas_dim, backwardHorizon] = size(sensor_disturbance);
             [control_dim, forwardHorizon] = size(uForward);
-
-            uk = uBack;
-            n = backwardHorizon-1;
-            if disturbType == 0
-            elseif disturbType == 1
-                %time-varying additive
-                for i = 1:n
-                    uk(:,i) = uk(:,i) + disturbance(:,i);
-                end
-            elseif disturbType == 2
-                %time-invariant additive
-                for i = 1:n
-                    uk(:,i) = uk(:,i) + disturbance;
-                end
-            elseif disturbType == 3
-                %time-invariant matrix transform
-                for i = 1:n
-                    uk(:,i) = disturbance*uk(:,i);
-                end
-            else
-                %time-invariant matrix transform + additive
-                dMatrix = disturbance(1:control_dim, 1:control_dim);
-                dAdd    = disturbance(1:control_dim, end);
-                for i = 1:n
-                    uk(:,i) = dMatrix*uk(:,i) + dAdd;
-                end
-            end
-            xk = [Tx0, Tx(:,1:backwardHorizon-1)];
+            
             Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
-            Jcost = Jcost - mheQ*norm2(Tx(:,1:backwardHorizon) - (A*xk + B*uk)) - mheR*norm2(meas - ( MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) + sensor_disturbance) );
+            Jcost = Jcost - mheQ*norm2(disturbance) - mheR*norm2(meas - MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) );
         end
     end
 end

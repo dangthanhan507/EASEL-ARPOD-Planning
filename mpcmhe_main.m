@@ -11,15 +11,20 @@ function benchmark = mpcmhe_main(mode)
     use2D = false;
     useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 15; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
     mhe_horizon = 10;
     total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
     state_dim = 6;
-    meas_dim = 6;
     control_dim = 3;
     att_dim = 6;
+
+    if useNonlinear == true
+        meas_dim = 3;
+    else
+        meas_dim = 6;
+    end
     
     mpcmhe = MPCMHE;
     mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
@@ -28,14 +33,15 @@ function benchmark = mpcmhe_main(mode)
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
     if mode == 1
-        % disturbance = [0.03;0.03;0.03];
-        disturbance = zeros(3,1);
+        disturbance = [0.03;0.03;0.03];
+        % disturbance = zeros(3,1);
         disturbance_fn = @(u) disturbance + u;
 
 
         mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.05);
         % mpcmhe = mpcmhe.setupLTILinearFixedBody(A,B,eye(state_dim),1e3,1,1,1);
-        mpcmhe = mpcmhe.setupUnconstrainedFixedBody(A,B,eye(state_dim), 1e3, 1, 1, 1);
+        % mpcmhe = mpcmhe.setupUnconstrainedFixedBody(A,B,eye(state_dim), 1e3, 1, 1e6, 1e6);
+        mpcmhe = mpcmhe.setupUnconstrainedFixedBodyNonlinear(A,B, 1e3, 1, 1e6, 1e6);
         mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
     elseif mode == 2
         disturbance = [0.03;0.03;0.03];
@@ -78,19 +84,11 @@ function benchmark = mpcmhe_main(mode)
 
     benchmark = ThrusterBenchmark;
     benchmark = benchmark.init(useNonlinear, mhe_horizon, mpc_horizon, total_time, tstep, false, useAttitude);
-    %{
-        The noiseQ, noiseR, and traj0 dimensions have to agree with the use2D and useAttitude
-    %}
-
     %======================= NOISE ===========================
-    % 2d no att
-    % noiseQ = @() [0;0;0;0];
-    % noiseR = @() [0;0;0;0];
-    % traj0 = [1;1;0.001;0.001];
-
     % 3d w/ att
     noiseQ = @() [0;0;0;0;0;0];
-    noiseR = @() [0;0;0;0;0;0];
+    % noiseR = @() [0;0;0;0;0;0];
+    noiseR = @() [0;0;0];
     traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
     %======================= NOISE END ========================
 

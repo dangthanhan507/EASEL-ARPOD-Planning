@@ -93,7 +93,9 @@ classdef ARPOD_Mission
             obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise);
             obj.traj = obj.dynamics.currentTraj();
 
-            obj.phase = ARPOD_Mission.calculatePhase(obj.traj);
+            % obj.phase = ARPOD_Mission.calculatePhase(obj.traj);
+            % NOTE: hard coded phase because we aren't concerned with partial observability
+            obj.phase = 2;
 
             if useFullSense
                 obj.sensor = ARPOD_Sensor.fullSense(obj.traj, sensor_noise);

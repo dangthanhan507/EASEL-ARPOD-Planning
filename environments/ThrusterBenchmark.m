@@ -128,10 +128,15 @@ classdef ThrusterBenchmark
             attcontrol_dim = 3;
             [state_dim,n] = size(traj0);
             [attstate_dim,n] = size(att0);
+            if obj.use_nonlinear == true
+                meas_dim = 3;
+            else
+                meas_dim = 6;
+            end
 
             %setup MPC-MHE windows
             window_states = zeros(state_dim,obj.mhe_horizon);
-            window_measurements = zeros(state_dim,obj.mhe_horizon);
+            window_measurements = zeros(meas_dim,obj.mhe_horizon);
             window_controls = zeros(control_dim,obj.mhe_horizon);
 
 
@@ -154,7 +159,7 @@ classdef ThrusterBenchmark
                 uMat = eye(3);
             end
             for i = obj.tstep:obj.tstep:obj.mhe_horizon % [tstep -> obj.mhe_horizon] inclusive steps by tstep
-                Mission = Mission.nextStep(uMat*u,noiseQ,noiseR,true);
+                Mission = Mission.nextStep(uMat*u,noiseQ,noiseR,~obj.use_nonlinear);
                 if obj.use_attitude
                     Mission = Mission.nextAttStep(uatt, noiseQatt, noiseRatt);
                 end
@@ -190,7 +195,7 @@ classdef ThrusterBenchmark
 
             obj.true_trajs      = zeros(state_dim, num_steps);
             obj.estimated_trajs = zeros(state_dim, num_steps);
-            obj.measurements    = zeros(state_dim,  num_steps);
+            obj.measurements    = zeros(meas_dim,  num_steps);
             obj.control_vectors = zeros(control_dim, num_steps);
             obj.true_control    = zeros(control_dim, num_steps);
 
@@ -215,7 +220,7 @@ classdef ThrusterBenchmark
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
-                Mission = Mission.nextStep(uMat*disturbance_fn(u),noiseQ,noiseR,true);
+                Mission = Mission.nextStep(uMat*disturbance_fn(u),noiseQ,noiseR,~obj.use_nonlinear);
                 Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 
                 att_meas = Mission.att_sensor;
