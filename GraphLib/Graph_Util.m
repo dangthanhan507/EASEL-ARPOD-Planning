@@ -21,13 +21,13 @@ classdef Graph_Util
             z = pos(3,:);
             plot3(x,y,z,color);
         end
-        function void = plot3d_to_2d(t,x,y,z)
+        function void = plot3d_to_2d(t,x,y,z, colors)
             subplot(3,1,1)
-            plot(t,x,'r');
+            plot(t,x,colors(1));
             subplot(3,1,2)
-            plot(t,y,'g');
+            plot(t,y,colors(2));
             subplot(3,1,3)
-            plot(t,z,'b');
+            plot(t,z,colors(3));
         end
         function tstamps = steps2time(nsteps,tstep)
             tstamps = 0:tstep:(nsteps*tstep);
@@ -38,7 +38,7 @@ classdef Graph_Util
                 mpccell: 6xN representing current mpc future expected states
                 state    : 3x1 representing current spacecraft state
             %}
-            [state_dim, nothing] = state;
+            [state_dim, nothing] = size(state);
             mhe_pos = mhecell(1:state_dim/2,:);
             mpc_pos = mpccell(1:state_dim/2,:);
 
@@ -50,8 +50,13 @@ classdef Graph_Util
             error = vecnorm(gt - est);
             plot(ts,error,color);
         end
-        function fuel = getFuel(control,mass,tstep)
-            fuel = mass*control*tstep;
+        function void = plotFuel(controls,mass,tstep)
+            [control_dim, horizon] = size(controls);
+            fuel = mass*tstep*abs(controls);
+            ts   = linspace(0,horizon*tstep,horizon);
+
+            fuel = sum(fuel,1);
+            plot(ts,fuel)
         end
     end
     methods (Static)
@@ -74,8 +79,8 @@ classdef Graph_Util
             mheXs = obj.benchmark.mheXs{tidx};
             mpcXs = obj.benchmark.mpcXs{tidx};
 
-            true_trajs = obj.true_trajs;
-            est_trajs = obj.estimated_trajs;
+            true_trajs = obj.benchmark.true_trajs;
+            est_trajs = obj.benchmark.estimated_trajs;
 
             [true_pos, true_vel] = Graph_Util.decomposeTraj(true_trajs);
             [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
@@ -90,9 +95,32 @@ classdef Graph_Util
             Graph_Util.plotSpacecraft(mheXs, mpcXs, est_trajs(tidx,:));
             hold off
         end
+        function void = graphFuel(obj)
+            controls = obj.benchmark.control_vectors;
+            mass = ARPOD_Mission.m_c;
+            tstep = obj.benchmark.tstep;
+            figure
+            hold on
+            Graph_Util.getFuel(controls,mass,tstep);
+            hold off
+        end
+        function void = graphTrajs2d(obj)
+            true_trajs = obj.benchmark.true_trajs;
+            est_trajs  = obj.benchmark.estimated_trajs;
+            [true_pos, true_vel] = Graph_Util.decomposeTraj(true_trajs);
+            [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
+            ts = Graph_Util.steps2time(nsteps, obj.benchmark.tstep);
+
+            figure;
+            hold on
+            %plot full traj
+            Graph_Util.plot3d_to_2d(ts,true_pos(1,:),true_pos(2,:),true_pos(3,:), ["r","g","b"]);
+            Graph_Util.plot3d_to_2d(ts,est_pos(1,:),est_pos(2,:),est_pos(3,:), ["ro","go","bo"]);
+            hold off
+        end
         function void = graphTrajs(obj)
-            true_trajs = obj.true_trajs;
-            est_trajs = obj.estimated_trajs;
+            true_trajs = obj.benchmark.true_trajs;
+            est_trajs = obj.benchmark.estimated_trajs;
 
             [true_pos, true_vel] = Graph_Util.decomposeTraj(true_trajs);
             [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
