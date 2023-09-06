@@ -4,6 +4,6 @@ function void = run_graph(benchmark)
     
     graph_util.graphTrajs();
     graph_util.graphTrajs2d();
-    graph_util.graphSpacecraftPos(0);
+    graph_util.graphSpacecraftPos(1);
     graph_util.graphFuel();
 end
