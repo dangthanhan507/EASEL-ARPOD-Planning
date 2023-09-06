@@ -22,6 +22,7 @@ classdef Graph_Util
             plot3(x,y,z,color);
         end
         function void = plot3d_to_2d(t,x,y,z, colors)
+            disp(colors(1))
             subplot(3,1,1)
             plot(t,x,colors(1));
             subplot(3,1,2)
@@ -31,6 +32,7 @@ classdef Graph_Util
         end
         function tstamps = steps2time(nsteps,tstep)
             tstamps = 0:tstep:(nsteps*tstep);
+            tstamps = tstamps(:,1:end-1);
         end
         function void = plotSpacecraft(mhecell, mpccell, state)
             %{  
@@ -39,12 +41,12 @@ classdef Graph_Util
                 state    : 3x1 representing current spacecraft state
             %}
             [state_dim, nothing] = size(state);
-            mhe_pos = mhecell(1:state_dim/2,:);
-            mpc_pos = mpccell(1:state_dim/2,:);
+            mhe_pos = mhecell(1:3,:);
+            mpc_pos = mpccell(1:3,:);
 
-            plotPos(mhe_pos, 'b--o');
-            plotPos(mpc_pos, 'r--o');
-            plotPos(state(1:state_dim/2,:), 'go');
+            Graph_Util.plotPos(mhe_pos, 'b--o');
+            Graph_Util.plotPos(mpc_pos, 'r--o');
+            Graph_Util.plotPos(state(1:3,:), 'go');
         end
         function void = plotVecError(ts, gt, est, color)
             error = vecnorm(gt - est);
@@ -59,21 +61,20 @@ classdef Graph_Util
             plot(ts,fuel)
         end
     end
-    methods (Static)
+    methods
         function obj = init(obj, benchmark);
             obj.benchmark = benchmark;
         end
         function void = graphErrors(obj)
-            [control_dim, nsteps] = obj.benchmark.control_vectors;
+            [control_dim, nsteps] = size(obj.benchmark.control_vectors);
             ts = Graph_Util.steps2time(nsteps, obj.benchmark.tstep);
             figure;
-            hold on
-            subplot(2,1,1);
-            Graph_Util.plotVecError(ts, obj.benchmark.true_trajs, obj.benchmark.estimated_trajs);
-            subplot(2,1,2);
-            Graph_Util.plotVecError(ts, obj.benchmark.true_control, obj.benchmark.control_vectors);
-            % Graph_Util.plotVecError(ts, obj.benchmark.true_att_trajs, obj.benchmark.est_att_trajs);
-            hold off
+            subplot(3,1,1);
+            Graph_Util.plotVecError(ts, obj.benchmark.true_trajs, obj.benchmark.estimated_trajs, 'r-');
+            subplot(3,1,2);
+            Graph_Util.plotVecError(ts, obj.benchmark.true_control, obj.benchmark.control_vectors, 'b-');
+            subplot(3,1,3);
+            Graph_Util.plotVecError(ts, obj.benchmark.true_att_trajs, obj.benchmark.est_att_trajs, 'g-');
         end
         function void = graphSpacecraftPos(obj, tidx)
             mheXs = obj.benchmark.mheXs{tidx};
@@ -86,13 +87,13 @@ classdef Graph_Util
             [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
 
             figure;
-            hold on
             %plot full traj
-            Graph_Util.scatterPos(true_pos,'r');
-            Graph_Util.scatterPos(est_pos,'b');
+            Graph_Util.plotPos(true_pos,'r');
+            hold on
+            Graph_Util.plotPos(est_pos,'b');
 
             %plot spacecraft currently
-            Graph_Util.plotSpacecraft(mheXs, mpcXs, est_trajs(tidx,:));
+            Graph_Util.plotSpacecraft(mheXs, mpcXs, est_trajs(:,tidx));
             hold off
         end
         function void = graphFuel(obj)
@@ -100,22 +101,32 @@ classdef Graph_Util
             mass = ARPOD_Mission.m_c;
             tstep = obj.benchmark.tstep;
             figure
-            hold on
-            Graph_Util.getFuel(controls,mass,tstep);
-            hold off
+            Graph_Util.plotFuel(controls,mass,tstep);
         end
         function void = graphTrajs2d(obj)
             true_trajs = obj.benchmark.true_trajs;
             est_trajs  = obj.benchmark.estimated_trajs;
             [true_pos, true_vel] = Graph_Util.decomposeTraj(true_trajs);
             [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
-            ts = Graph_Util.steps2time(nsteps, obj.benchmark.tstep);
+            [control_dim, nsteps] = size(obj.benchmark.control_vectors);
+            t = Graph_Util.steps2time(nsteps, obj.benchmark.tstep);
 
             figure;
-            hold on
             %plot full traj
-            Graph_Util.plot3d_to_2d(ts,true_pos(1,:),true_pos(2,:),true_pos(3,:), ["r","g","b"]);
-            Graph_Util.plot3d_to_2d(ts,est_pos(1,:),est_pos(2,:),est_pos(3,:), ["ro","go","bo"]);
+            subplot(3,1,1)
+            plot(t,true_pos(1,:),"r-");
+            hold on
+            plot(t,est_pos(1,:),"ro");
+            hold off
+            subplot(3,1,2)
+            plot(t,true_pos(2,:),"g-");
+            hold on
+            plot(t,est_pos(2,:),"go");
+            hold off
+            subplot(3,1,3)
+            plot(t,true_pos(3,:),"b-");
+            hold on 
+            plot(t,est_pos(3,:),"bo");
             hold off
         end
         function void = graphTrajs(obj)
@@ -126,10 +137,10 @@ classdef Graph_Util
             [est_pos, est_vel]   = Graph_Util.decomposeTraj(est_trajs);
 
             figure;
-            hold on
             %plot full traj
-            Graph_Util.scatterPos(true_pos,'r');
-            Graph_Util.scatterPos(est_pos,'b');
+            Graph_Util.plotPos(true_pos,'r');
+            hold on
+            Graph_Util.plotPos(est_pos,'b');
             hold off
         end
     end
