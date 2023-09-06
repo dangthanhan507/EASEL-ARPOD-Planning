@@ -10,7 +10,7 @@ function benchmark = mpcmhe_6dof_main(mode)
     %Keep 2d = false
     %Keep attitude = true
     use2D = false;
-    useNonlinear = true;
+    useNonlinear = false;
     useAttitude = true;
     mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
     mhe_horizon = 5;
@@ -40,7 +40,8 @@ function benchmark = mpcmhe_6dof_main(mode)
 
         mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.2);
         % mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e2,1,1e6,1e6);
+        % mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e2,1,1e6,1e6);
+        mpcmhe = mpcmhe.setupLTICoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
         mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
     elseif mode == 2
         disturbance = 0.01*ones(6,1);
@@ -97,7 +98,13 @@ function benchmark = mpcmhe_6dof_main(mode)
     % 3d w/ att
     noiseQ = @() [0;0;0;0;0;0];
     % noiseR = @() [0;0;0;0;0;0];
-    noiseR = @() [0;0;0];
+    if useNonlinear == true
+        noiseR = @() [0;0;0];
+    else
+        noiseR = @() [0;0;0;0;0;0];
+    end
+    
+
     traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
     %======================= NOISE END ========================
 
