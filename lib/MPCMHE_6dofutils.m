@@ -83,6 +83,32 @@ classdef MPCMHE_6dofutils
             Rz = [cos(yaw) -sin(yaw) 0; sin(yaw) cos(yaw) 0; 0 0 1];
             rotmat = Rz*Ry*Rx;
         end
+        function output = FullRotation(theta, us)
+            %{
+                theta = [roll_1, roll_2, ..., roll_n]
+                        [pitch_1, pitch_2, ..., pitch_n]
+                        [yaw_1, yaw_2, ..., yaw_n]
+            %}
+
+            %fully expanded rotation matrix but we vectorize this
+            R_11 = cos(theta(3,:)).*cos(theta(2,:));
+            R_12 = -sin(theta(3,:)).*cos(theta(1,:)) + cos(theta(3,:)).*sin(theta(2,:)).*sin(theta(1,:));
+            R_13 = sin(theta(3,:)).*sin(theta(1,:)) + cos(theta(3,:)).*sin(theta(2,:)).*cos(theta(1,:));
+
+            R_21 = sin(theta(3,:)).*cos(theta(2,:));
+            R_22 = cos(theta(3,:)).*cos(theta(1,:)) + sin(theta(3,:)).*sin(theta(2,:)).*sin(theta(1,:));
+            R_23 = -cos(theta(3,:)).*sin(theta(1,:)) + sin(theta(3,:)).*sin(theta(2,:)).*cos(theta(1,:));
+
+            R_31 = -sin(theta(2,:));
+            R_32 = cos(theta(2,:)).*sin(theta(1,:));
+            R_33 = cos(theta(2,:)).*cos(theta(1,:));
+            
+            %size(us) = 3 x N
+
+            output = [sum(R_11.*us(1,:) + R_12.*us(2,:) + R_13.*us(3,:), 1),... % N size
+                      sum(R_21.*us(1,:) + R_22.*us(2,:) + R_23.*us(3,:), 1),...
+                      sum(R_31.*us(1,:) + R_32.*us(2,:) + R_33.*us(3,:), 1)].';
+        end
         function dynamicConstraints = createCoupledLTIDynamics(A, B, Tx0, Tx, Tatt0, Tatt, uback, uforward, disturbance, disturbType)
             xk = [Tx0, Tx(:,1:end-1)];  
             attk = [Tatt0, Tatt(:,1:end-1)];
@@ -106,7 +132,7 @@ classdef MPCMHE_6dofutils
             u = Tzeros(3, n);
 
             for i = 1:n
-                R = MPCMHE_6dofutils.Rotation(attk(1,i), attk(2,i), attk(3,i));
+                % R = MPCMHE_6dofutils.Rotation(attk(1,i), attk(2,i), attk(3,i));
                 if disturbType == 0
                 elseif disturbType == 1
                     uk(:,i) = (uk(:,i) + disturbance(:,i));
@@ -120,8 +146,10 @@ classdef MPCMHE_6dofutils
                     dAdd    = disturbance(1:control_dim, end);
                     uk(:,i) = dMatrix*uk(:,i) + dAdd;
                 end
-                u(:,i) = R*D*(uk(:,i));
             end
+            u = MPCMHE_6dofutils.FullRotation(attk(1:3,:),D*uk);
+            disp("size uk")
+            disp(size(u));
             dynamicConstraints = (Tx == A*xk + B*u);
 
         end

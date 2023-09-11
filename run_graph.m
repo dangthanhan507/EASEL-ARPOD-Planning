@@ -7,4 +7,6 @@ function void = run_graph(benchmark)
     graph_util.graphSpacecraftPos(1);
     graph_util.graphFuel();
     graph_util.graphErrors();
+    % time vs estimated disturbance AND time vs actual disturbance
+    % 
 end
