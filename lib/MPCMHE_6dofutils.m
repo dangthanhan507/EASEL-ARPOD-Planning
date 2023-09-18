@@ -85,15 +85,16 @@ classdef MPCMHE_6dofutils
         function opt_properties = setupUnconstrainedOptimizationCells(costFunction, dynamicConstraints, dMax, uMax, vMax, Tx0, Tx, Td, TD, Tuback, Tyback, Tvback, Tuforward)
             opt_properties = MPCMHE_properties;
             opt_properties = opt_properties.init(costFunction,  {Tuforward}, ...
-                                                                {Td, Tvback,Tx0}, ...
+                                                                {Td, Tvback,Tx0, TD}, ...
                                                                 {Tx},...
                                                                     {Tuforward <= uMax*Tones(size(Tuforward)), Tuforward >= -1e-5*Tones(size(Tuforward))},...
                                                                 {Td<=dMax*Tones(size(Td)), Td>=-dMax*Tones(size(Td)),...
-                                                                    Tvback<=vMax*Tones(size(Tvback)), Tvback>=-vMax*Tones(size(Tvback))},...
+                                                                    Tvback<=vMax*Tones(size(Tvback)), Tvback>=-vMax*Tones(size(Tvback)),...
+                                                                    TD<=1.3*Tones(size(TD)), TD>=-1.3*Tones(size(TD)) },...
                                                                 {dynamicConstraints},...
-                                                                {Tuforward,Td,Tx0,Tx,Tvback},...
+                                                                {Tuforward,Td,Tx0,Tx,Tvback, TD},...
                                                                 {Tuback,Tyback});
-            opt_properties = opt_properties.addTD(TD);
+            % opt_properties = opt_properties.addTD(TD);
         end        
 
         %======== Adding Rotation =============
@@ -135,9 +136,17 @@ classdef MPCMHE_6dofutils
 
             [control_dim, n] = size(uk);
 
-            uk = D*uk + disturbance;
-            u = MPCMHE_6dofutils.FullRotation(attk(1:3,:),uk(1:3,:) - uk(4:6,:));
+            uk = D*(uk + disturbance);
+            u = MPCMHE_6dofutils.FullRotation(attk(1:3,:), uk(1:3,:) - uk(4:6,:));
+            % u = uk(1:3,:) - uk(4:6,:);
             dynamicConstraints = (Tx == A*xk + B*u);
+        end
+        function Jcost = objectiveUnconstrainedMPCMHENonlinearMeas(A, B, mpcQ, mpcR, mheQ, mheR, Tx, uBack, uForward, meas, disturbance, TD, sensor_disturbance, disturbType)
+            [meas_dim, backwardHorizon] = size(sensor_disturbance);
+            [control_dim, forwardHorizon] = size(uForward);
+            
+            Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
+            Jcost = Jcost - mheQ*norm2(TD) - mheQ*norm2(disturbance) - mheR*norm2(meas - MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) );
         end
         function dynamicConstraints = createCoupledLTIDynamics(A, B, Tx0, Tx, Tatt0, Tatt, uback, uforward, disturbance, disturbType)
             xk = [Tx0, Tx(:,1:end-1)];  
@@ -178,13 +187,6 @@ classdef MPCMHE_6dofutils
             u = MPCMHE_6dofutils.FullRotation(attk(1:3,:),uk(1:3,:) - uk(4:6,:));
             dynamicConstraints = (Tx == A*xk + B*u);
 
-        end
-        function Jcost = objectiveUnconstrainedMPCMHENonlinearMeas(A, B, mpcQ, mpcR, mheQ, mheR, Tx, uBack, uForward, meas, disturbance, TD, sensor_disturbance, disturbType)
-            [meas_dim, backwardHorizon] = size(sensor_disturbance);
-            [control_dim, forwardHorizon] = size(uForward);
-            
-            Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
-            Jcost = Jcost - mheQ*norm2(TD) - mheQ*norm2(disturbance) - mheR*norm2(meas - MPCMHE_Tcalcutils.applyNonlinearSensor(Tx(:,1:backwardHorizon)) );
         end
         function [window,att_window, D0] = mpcmhe_solve(window, att_window, opt, mu0, maxIter, saveIter, use_attitude)
             [status,iter,time] = solve(opt,mu0,int32(maxIter),int32(saveIter));

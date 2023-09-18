@@ -254,6 +254,28 @@ classdef MPCMHE_Tcalcutils
         %{
             arctan function for MHE
         %}
+        function z_t = SensingVectorized(states)
+            %{
+                states: 6xN
+            %}
+            [statedim, N] = size(states);
+            xs = states(1,:);
+            ys = states(2,:);
+            zs = states(3,:);
+
+            % rho = norm(states(1:3,:),2); %1xN
+            rho = sqrt(power(states(1,:),2) + power(states(2,:),2) + power(states(3,:),2));
+            disp(rho)
+            
+            z_norm = (zs ./ rho);
+            e1 = atan(ys ./ xs);
+            e2 = atan( z_norm ./ sqrt((1+z_norm).*(1-z_norm)));
+            z_t = Tzeros(3,N);
+            z_t(1,:) = e1;
+            z_t(2,:) = e2;
+            z_t(3,:) = rho;
+            % z_t = [e1;e2;rho];
+        end
         function z_t = Sensing(state)
             x = state(1,:);
             y = state(2,:);
@@ -271,10 +293,12 @@ classdef MPCMHE_Tcalcutils
         end
         function gX = applyNonlinearSensor(Tstates)
             [state_dim, num] = size(Tstates);
-            gX = Tzeros(3,num);
-            for i = 1:num
-                gX(:,i) = MPCMHE_Tcalcutils.Sensing(Tstates(:,i));
-            end
+            % gX = Tzeros(3,num);
+            % for i = 1:num
+            %     gX(:,i) = MPCMHE_Tcalcutils.Sensing(Tstates(:,i));
+            % end
+
+            gX = MPCMHE_Tcalcutils.SensingVectorized(Tstates);
             %return sensor version of everything
         end
         function measurementConstraints = createNonlinearSensorConstraint(Tx, sensorDisturb, measurements, backwardHorizon)

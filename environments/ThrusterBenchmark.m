@@ -159,7 +159,33 @@ classdef ThrusterBenchmark
                 uMat = eye(3);
             end
             for i = obj.tstep:obj.tstep:obj.mhe_horizon % [tstep -> obj.mhe_horizon] inclusive steps by tstep
-                Mission = Mission.nextStep(uMat*u,noiseQ,noiseR,~obj.use_nonlinear);
+
+                if obj.use_attitude
+                    rot = eye(3);
+                    use_att = Mission.att;
+                    
+                    roll  = use_att(1);
+                    pitch = use_att(2);
+                    yaw   = use_att(3);
+
+                    roll_mat = [1,0,0;
+                                0,cos(roll),-sin(roll);
+                                0,sin(roll),cos(roll)];
+                    pitch_mat = [cos(pitch),0,sin(pitch);
+                                 0,1,0;
+                                 -sin(pitch),0,cos(pitch)];
+                    yaw_mat = [cos(yaw),-sin(yaw),0;
+                               sin(yaw),cos(yaw),0;
+                               0,0,1];
+                    rot = yaw_mat*pitch_mat*roll_mat;
+                    
+
+                    use_u = rot*(uMat*u);
+                    % use_u = uMat*u;
+                else
+                    use_u = uMat*u;
+                end
+                Mission = Mission.nextStep(use_u,noiseQ,noiseR,~obj.use_nonlinear);
                 if obj.use_attitude
                     Mission = Mission.nextAttStep(uatt, noiseQatt, noiseRatt);
                 end
@@ -218,9 +244,35 @@ classdef ThrusterBenchmark
                 obj.mpcUsAtt           = cell(num_steps);
             end
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
+                if obj.use_attitude
+                    rot = eye(3);
+                    use_att = Mission.att;
+                    
+                    roll  = use_att(1);
+                    pitch = use_att(2);
+                    yaw   = use_att(3);
+
+                    roll_mat = [1,0,0;
+                                0,cos(roll),-sin(roll);
+                                0,sin(roll),cos(roll)];
+                    pitch_mat = [cos(pitch),0,sin(pitch);
+                                 0,1,0;
+                                 -sin(pitch),0,cos(pitch)];
+                    yaw_mat = [cos(yaw),-sin(yaw),0;
+                               sin(yaw),cos(yaw),0;
+                               0,0,1];
+                    rot = yaw_mat*pitch_mat*roll_mat;
+                    
+
+                    use_u = rot*(uMat*disturbance_fn(u));
+                    % use_u = uMat*disturbance_fn(u);
+                else
+                    use_u = uMat*disturbance_fn(u);
+                end
+
                 idx = (i - obj.mhe_horizon)/obj.tstep;
 
-                Mission = Mission.nextStep(uMat*disturbance_fn(u),noiseQ,noiseR,~obj.use_nonlinear);
+                Mission = Mission.nextStep(use_u,noiseQ,noiseR,~obj.use_nonlinear);
                 Mission = Mission.nextAttStep(uatt,noiseQatt,noiseRatt);      
 
                 att_meas = Mission.att_sensor;

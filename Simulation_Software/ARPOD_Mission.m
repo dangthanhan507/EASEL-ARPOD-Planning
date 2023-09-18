@@ -88,6 +88,7 @@ classdef ARPOD_Mission
         end
         function obj = useAttitude(obj, att)
             obj.dynamics = obj.dynamics.initAttitude(att);
+            obj.att = att;
         end
         function obj = nextStep(obj, control, system_noise, sensor_noise, useFullSense)
             obj.dynamics = obj.dynamics.nextStep(control, obj.tstep, ARPOD_Mission.a, ARPOD_Mission.mu, system_noise);

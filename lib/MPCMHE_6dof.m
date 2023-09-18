@@ -8,7 +8,6 @@ classdef MPCMHE_6dof < MPCMHE
                 0,  0,  1,  0,  0, -1];
 
         TD
-
         D0
     end
     methods 
@@ -22,7 +21,7 @@ classdef MPCMHE_6dof < MPCMHE
             obj.forwardT = forwardT;
             obj.disturbType = disturbType;
 
-            obj.D0 = zeros(control_dim, control_dim);
+            obj.D0 = eye(control_dim);
         end
         function obj = setupLTIUncoupled(obj, A, B, C, mpcQ, mpcR, mheQ, mheR)
             obj.dynamicConstraints = MPCMHE_6dofutils.createFixedBodyLTIDynamics(A,B,obj.Tx0, obj.Tx, obj.Tuback, obj.Tuforward, obj.Td, obj.disturbType);
@@ -34,7 +33,7 @@ classdef MPCMHE_6dof < MPCMHE
                                                         obj.Tuforward);
         end
         function obj = setupUncoupledUnconstrainedNonlinear(obj, A, B, mpcQ, mpcR, mheQ, mheR)
-            obj.dynamicConstraints = MPCMHE_6dofutils.createCoupledLTIDynamics(A,B,obj.Tx0, obj.Tx, obj.attTx0, obj.attTx, obj.Tuback, obj.Tuforward, obj.Td, obj.disturbType);
+            obj.dynamicConstraints = MPCMHE_6dofutils.createOfficialDynamics(A,B,obj.Tx0, obj.Tx, obj.attTx0, obj.attTx, obj.Tuback, obj.Tuforward, obj.TD, obj.Td, obj.disturbType);
             obj.costFunction       = MPCMHE_6dofutils.objectiveUnconstrainedMPCMHENonlinearMeas(A, B, mpcQ, mpcR, mheQ, mheR, obj.Tx, obj.Tuback, obj.Tuforward, obj.Tyback, obj.Td, obj.TD, obj.Tvback, obj.disturbType);
             obj.opt_properties = MPCMHE_6dofutils.setupUnconstrainedOptimizationCells(obj.costFunction,obj.dynamicConstraints,...
                                                         obj.dMax, obj.uMax, obj.vMax,...
