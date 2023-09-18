@@ -10,10 +10,11 @@ function benchmark = mpcmhe_6dof_main()
     %Keep 2d = false
     %Keep attitude = true
     use2D = false;
-    useNonlinear = true;
+    useNonlinear = false;
     useAttitude = true;
-    mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-    mhe_horizon = 5;
+    useOfficial = false;
+    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mhe_horizon = 10;
     total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
@@ -28,7 +29,7 @@ function benchmark = mpcmhe_6dof_main()
     end
 
     mpcmhe = MPCMHE_6dof;
-    mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim);
+    mpcmhe = mpcmhe.init(mode, mhe_horizon, mpc_horizon, state_dim, meas_dim, control_dim, att_dim,useOfficial);
     [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep, ARPOD_Mission.mu, ARPOD_Mission.a, use2D);
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
     
@@ -37,12 +38,17 @@ function benchmark = mpcmhe_6dof_main()
     d_disturbance = zeros(6,1);
     D_disturbance = eye(3);
     bigD = blkdiag(D_disturbance,D_disturbance);
-    disturbance_fn = @(u) bigD* (u + d_disturbance);
+    disturbance_fn = @(u) bigD * (u + d_disturbance);
 
     mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.3);
-    mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e10,1e5,1e3,1e3);
+    if useOfficial == true 
+        mpcmhe = mpcmhe.setupCoupledUnconstrainedNonlinear(A,B,1e3,1e2,1e3,1e3);
+    else
+        mpcmhe = mpcmhe.setupLTICoupled(A,B,eye(6),1e3,1e1,1e3,1e1);
+    end
+    
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
-    mpcmhe = mpcmhe.setupAttitudeCost(1e10,1,1,1);
+    mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
 
     mpcmhe = mpcmhe.addAttitudeOptimization();
     mpcmhe = mpcmhe.setupOptimizationVar();
@@ -65,8 +71,8 @@ function benchmark = mpcmhe_6dof_main()
     end
     
 
-    % traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
-    traj0 = [1;1;1;0;0;0;0;0;0;0;0;0];
+    traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
+    % traj0 = [1;1;1;0;0;0;0;0;0;0;0;0];
     %======================= NOISE END ========================
 
     disp("passed compiliation")
