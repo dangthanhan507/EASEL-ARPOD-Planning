@@ -57,13 +57,17 @@ classdef MPCMHE_properties
             obj.muAggressive = 0.5;
             obj.muConservative = 0.99;
             obj.targetDualityGap = 0.3;
-            obj.maxIter = 2000;
+            obj.maxIter = 100;
             obj.gradientTolerance = 1e-2;
             obj.delta = 2;
             obj.compilerFlags = '-O1';
             obj.allowSave = true;
             obj.solverVerboseLevel = 1;
             obj.verboseLevel = 1;
+        end
+        function obj = addTD(obj, TD)
+            obj.P2optimizationVariablesCell = [obj.P2optimizationVariablesCell, {TD}];
+            obj.outputExpressionsCell = [obj.outputExpressionsCell, {TD}];
         end
         function obj = concat(obj, other)
             %{
@@ -84,7 +88,7 @@ classdef MPCMHE_properties
             obj.parametersCell = [obj.parametersCell, other.parametersCell];
         end
         function opt = setupOptimization(obj)
-            classname = class2equilibriumLatentCS(...
+            classname = cmex2equilibriumLatentCS(...
                 'classname','tmpC_target_chaser_main',...
                 'P1objective',obj.objective,...
                 'P2objective',-obj.objective,...

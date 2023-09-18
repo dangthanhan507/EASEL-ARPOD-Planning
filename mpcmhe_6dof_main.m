@@ -1,19 +1,19 @@
-function benchmark = mpcmhe_6dof_main(mode)
-    delete("tmpC*") %delete any temporary files created
-    delete("@tmpC*") %delete any temporary files created
+function benchmark = mpcmhe_6dof_main()
+    % delete("tmpC*") %delete any temporary files created
     close all
     clc
     %fixes randomness for reproducibility of any plots
     rng(1);
 
 
+    mode = 1;
     %Keep 2d = false
     %Keep attitude = true
     use2D = false;
-    useNonlinear = false;
+    useNonlinear = true;
     useAttitude = true;
-    mpc_horizon = 10; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
-    mhe_horizon = 5;
+    mpc_horizon = 20; %NOTE:MUST STAY IMBALANCED. Without this imbalance, the cost will get completely cancelled out and no optimization
+    mhe_horizon = 10;
     total_time = 10+mhe_horizon; %total time in seconds + setup time
     tstep = 1;        %each time step is 1 second
 
@@ -33,56 +33,14 @@ function benchmark = mpcmhe_6dof_main(mode)
     [Aatt,Batt] = ARPOD_Dynamics.attitudeLVLH(tstep, use2D);
     mpcmhe = mpcmhe.setupAttitudeConstraints(Aatt, Batt, eye(att_dim));
     
-    if mode == 1
-        disturbance = 0.03*ones(6,1);
-        % disturbance = 0*ones(6,1);
-        disturbance_fn = @(u) disturbance + u;
+    d_disturbance = 0.01*ones(6,1);
+    D_disturbance = eye(3);
+    bigD = blkdiag(D_disturbance,D_disturbance);
+    disturbance_fn = @(u) bigD*u + d_disturbance;
 
-        mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.2);
-        % mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        % mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupLTICoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
-    elseif mode == 2
-        disturbance = 0.01*ones(6,1);
-        disturbance(2) = 0;
-        disturbance(4) = 0;
-        disturbance(6) = 0;
-        disturbance_fn = @(u) disturbance + u;
-
-        mpcmhe = mpcmhe.setupVariableLimits(0.03,0.1,0.5);
-        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
-    elseif mode == 3
-        disturbance = eye(6);
-        disturbance_fn = @(u) disturbance*u;
-        % a = 0;
-        % b = pi/3;
-        % c = -pi/3;
-        % Rx = [1 0 0; 0 cos(a) -sin(a); 0 sin(a) cos(a)];
-        % Ry = [cos(b) 0 sin(b); 0 1 0; -sin(b) 0 cos(b)];
-        % Rz = [cos(c) -sin(c) 0; sin(c) cos(c) 0; 0 0 1];
-        % disturbance = Rz*Ry*Rx;
-
-        % disturbance_fn = @(u)  [disturbance(1,:)*u(1:2:6); 
-        %                         disturbance(1,:)*u(2:2:6);
-        %                         disturbance(2,:)*u(1:2:6);
-        %                         disturbance(2,:)*u(2:2:6);
-        %                         disturbance(3,:)*u(1:2:6);
-        %                         disturbance(3,:)*u(2:2:6)];
-
-        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
-        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,1,1,1);
-    else
-        %Time invariant matrix transform and additive disturbance on control vector
-        disturbanceD = eye(3);
-        disturbanced = zeros(3,1);
-        disturbance_fn = @(u) disturbanceD*u + disturbanced;
-        mpcmhe = mpcmhe.setupLTIUncoupled(A,B,eye(state_dim),1e2,1,1e6,1e6);
-        mpcmhe = mpcmhe.setupAttitudeCost(1e3,10,1,1);
-        mpcmhe = mpcmhe.setupVariableLimits(1.3,0.1,0.2);
-    end
+    mpcmhe = mpcmhe.setupVariableLimits(0.05,0.1,0.2);
+    mpcmhe = mpcmhe.setupUncoupledUnconstrainedNonlinear(A,B,1e2,1,1e6,1e6);
+    mpcmhe = mpcmhe.setupAttitudeCost(1e2,1,1,1);
 
     mpcmhe = mpcmhe.addAttitudeOptimization();
     mpcmhe = mpcmhe.setupOptimizationVar();
@@ -108,9 +66,9 @@ function benchmark = mpcmhe_6dof_main(mode)
     traj0 = [1;1;1;1;1;1;0;0;0;0;0;0];
     %======================= NOISE END ========================
 
+    disp("passed compiliation")
     benchmark = benchmark.runBenchmark(traj0, noiseQ, noiseR, disturbance_fn, mpcmhe);
 
     disp("Actual transform: ")
-    disp(disturbance)
     delete("tmpC*") %delete any temporary files created
 end

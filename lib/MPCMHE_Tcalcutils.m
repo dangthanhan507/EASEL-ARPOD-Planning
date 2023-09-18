@@ -225,11 +225,6 @@ classdef MPCMHE_Tcalcutils
         end
         function [window,att_window] = mpcmhe_solve(window, att_window, opt, mu0, maxIter, saveIter, use_attitude)
             [status,iter,time] = solve(opt,mu0,int32(maxIter),int32(saveIter));
-
-            disp("Status:")
-            disp(status)
-            disp("Iterations:")
-            disp(iter)
             
             if use_attitude
                 [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(opt);
@@ -249,20 +244,11 @@ classdef MPCMHE_Tcalcutils
             end
             mheXs = xs(:,1:backwardT);
             mpcXs = xs(:,backwardT+1:end);
-
-            disp("Jcost:")
-            disp(Jcost)
-
             window.window_controlDisturbances = mheDs;
             window.window_measError = vs;
             window.window_mhestates = mheXs;
             window.window_mpcstates = mpcXs;
             window.window_mpccontrols = mpcUs;
-
-            disp("MPC Future")
-            disp(window.window_mpcstates)
-            disp("MPC control horizon")
-            disp(window.window_mpccontrols)
         end
         
         %{
