@@ -80,7 +80,6 @@ classdef MPCMHE_6dofutils
                                                                 {dynamicConstraints},...
                                                                 {Tuforward,Td,Tx0,Tx,Tvback},...
                                                                 {Tuback,Tyback});
-            opt_properties = opt_properties.addTD(TD);
         end
         function opt_properties = setupUnconstrainedOptimizationCells(costFunction, dynamicConstraints, dMax, uMax, vMax, Tx0, Tx, Td, TD, Tuback, Tyback, Tvback, Tuforward)
             opt_properties = MPCMHE_properties;
@@ -167,22 +166,23 @@ classdef MPCMHE_6dofutils
             [control_dim, n] = size(uk);
             u = Tzeros(3, n);
 
-            for i = 1:n
-                % R = MPCMHE_6dofutils.Rotation(attk(1,i), attk(2,i), attk(3,i));
-                if disturbType == 0
-                elseif disturbType == 1
-                    % uk(:,i) = (uk(:,i) + disturbance(:,i));
-                elseif disturbType == 2
-                    uk(:,i) = (uk(:,i) + disturbance);
+            % for i = 1:n
+            %     % R = MPCMHE_6dofutils.Rotation(attk(1,i), attk(2,i), attk(3,i));
+            %     if disturbType == 0
+            %     elseif disturbType == 1
+            %         % uk(:,i) = (uk(:,i) + disturbance(:,i));
+            %     elseif disturbType == 2
+            %         uk(:,i) = (uk(:,i) + disturbance);
 
-                elseif disturbType == 3
-                    uk(:,i) = disturbance*uk(:,i);
-                else
-                    dMatrix = disturbance(1:control_dim, 1:control_dim);
-                    dAdd    = disturbance(1:control_dim, end);
-                    uk(:,i) = dMatrix*uk(:,i) + dAdd;
-                end
-            end
+            %     elseif disturbType == 3
+            %         uk(:,i) = disturbance*uk(:,i);
+            %     else
+            %         dMatrix = disturbance(1:control_dim, 1:control_dim);
+            %         dAdd    = disturbance(1:control_dim, end);
+            %         uk(:,i) = dMatrix*uk(:,i) + dAdd;
+            %     end
+            % end
+            
             uk = uk + disturbance;
             u = MPCMHE_6dofutils.FullRotation(attk(1:3,:),uk(1:3,:) - uk(4:6,:));
             dynamicConstraints = (Tx == A*xk + B*u);

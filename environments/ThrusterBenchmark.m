@@ -161,7 +161,6 @@ classdef ThrusterBenchmark
             for i = obj.tstep:obj.tstep:obj.mhe_horizon % [tstep -> obj.mhe_horizon] inclusive steps by tstep
 
                 if obj.use_attitude
-                    rot = eye(3);
                     use_att = Mission.att;
                     
                     roll  = use_att(1);
@@ -180,8 +179,8 @@ classdef ThrusterBenchmark
                     rot = yaw_mat*pitch_mat*roll_mat;
                     
 
-                    use_u = rot*(uMat*u);
-                    % use_u = uMat*u;
+                    % use_u = rot*(uMat*u);
+                    use_u = uMat*u;
                 else
                     use_u = uMat*u;
                 end
@@ -245,7 +244,6 @@ classdef ThrusterBenchmark
             end
             for i = (obj.tstep+obj.mhe_horizon):obj.tstep:obj.total_time
                 if obj.use_attitude
-                    rot = eye(3);
                     use_att = Mission.att;
                     
                     roll  = use_att(1);
@@ -264,8 +262,8 @@ classdef ThrusterBenchmark
                     rot = yaw_mat*pitch_mat*roll_mat;
                     
 
-                    use_u = rot*(uMat*disturbance_fn(u));
-                    % use_u = uMat*disturbance_fn(u);
+                    % use_u = rot*(uMat*disturbance_fn(u));
+                    use_u = uMat*disturbance_fn(u);
                 else
                     use_u = uMat*disturbance_fn(u);
                 end

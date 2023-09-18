@@ -226,6 +226,11 @@ classdef MPCMHE_Tcalcutils
         function [window,att_window] = mpcmhe_solve(window, att_window, opt, mu0, maxIter, saveIter, use_attitude)
             [status,iter,time] = solve(opt,mu0,int32(maxIter),int32(saveIter));
             
+            disp("Status:")
+            disp(status)
+            disp("Iterations:")
+            disp(iter)
+
             if use_attitude
                 [Jcost, mpcUs, mheDs, x0s, xs, vs, attmpcUs, attmheDs, attx0s, attxs, attvs] = getOutputs(opt);
                 [measdim,backwardT] = size(vs);
@@ -249,6 +254,13 @@ classdef MPCMHE_Tcalcutils
             window.window_mhestates = mheXs;
             window.window_mpcstates = mpcXs;
             window.window_mpccontrols = mpcUs;
+
+            disp("Jcost:")
+            disp(Jcost)
+            disp("MPC Future")
+            disp(window.window_mpcstates)
+            disp("MPC control horizon")
+            disp(window.window_mpccontrols)
         end
         
         %{
@@ -265,7 +277,6 @@ classdef MPCMHE_Tcalcutils
 
             % rho = norm(states(1:3,:),2); %1xN
             rho = sqrt(power(states(1,:),2) + power(states(2,:),2) + power(states(3,:),2));
-            disp(rho)
             
             z_norm = (zs ./ rho);
             e1 = atan(ys ./ xs);
@@ -274,7 +285,6 @@ classdef MPCMHE_Tcalcutils
             z_t(1,:) = e1;
             z_t(2,:) = e2;
             z_t(3,:) = rho;
-            % z_t = [e1;e2;rho];
         end
         function z_t = Sensing(state)
             x = state(1,:);
