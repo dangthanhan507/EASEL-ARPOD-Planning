@@ -50,8 +50,9 @@ classdef tenscalc_utils
             uk = [uback, uforward];
 
             % uk = D*uk + disturbance;
-            % u = tenscalc_utils.FullRotation(attk(1:3,:), uk(1:3,:) - uk(4:6,:));
-            u = uk(1:3,:) - uk(4:6,:);
+            uk = D*uk;
+            u = tenscalc_utils.FullRotation(attk(1:3,:), uk(1:3,:) - uk(4:6,:));
+            % u = uk(1:3,:) - uk(4:6,:);
             dynamicConstraints = (Tx == A*xk + B*u);
         end
 

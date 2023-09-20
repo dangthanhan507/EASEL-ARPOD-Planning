@@ -2,6 +2,8 @@ classdef mpcmhe
     properties
         maxIter = 10;
         compileFlag = '-O1';
+        % optimizer = @cmex2equilibriumLatentCS;
+        optimizer = @class2equilibriumLatentCS;
         opt
 
 
@@ -114,8 +116,9 @@ classdef mpcmhe
 
             if obj.time_ctr > obj.backwardT
                 %main code
-                disp(obj.window_mheYs);
-                disp(obj.window_mheYsAtt);
+                % disp(obj.window_mheYs);
+                % disp(obj.window_mheYsAtt);
+                
                 % translational variable setting
                 setP_uback(obj.opt, obj.window_mheUs);
                 setP_ypast(obj.opt, obj.window_mheYs);
@@ -146,11 +149,6 @@ classdef mpcmhe
 
                 disp("Jcost:")
                 disp(Jtotal)                
-
-                disp("Translatioanl State Estimated")
-                disp(Xs(:,1))
-                disp("Translational Control Output")
-                disp(mpcUs(:,1))
 
                 mheXs = Xs(:,1:obj.backwardT);
                 mpcXs = Xs(:,obj.backwardT+1:end);
@@ -213,10 +211,10 @@ classdef mpcmhe
             dynamicsConstraintsTranslational = tenscalc_utils.mpcmheDynamicsTranslational(A_HCW, B_HCW,...
                                                                              x0, x, att0, att, uback, u, D, d);
 
-            mpcQ = 1e3;
-            mpcR = 1;
-            mheQ = 1e3;
-            mheR = 1e5;
+            mpcQ = 1e1;
+            mpcR = 1e1;
+            mheQ = 1e5;
+            mheR = 1e8;
             Jcost = tenscalc_utils.mpcmheObjectiveTranslational(mpcQ,mpcR,mheQ,mheR,x,u,ypast,d,D);
 
 
@@ -234,18 +232,18 @@ classdef mpcmhe
             uMax = 0.1;
             attuMax = 0.3;
             DMax = 1.4;
-            dMax = 0.05;
+            dMax = 0.1;
             attvMax = 0.8;
 
-            classname = class2equilibriumLatentCS(...
-                'classname','tmpC_target_chaser_main',...
+            classname = obj.optimizer(...
+                'classname','tmpC',...
                 'P1objective',Jtotal,...
                 'P2objective',-Jtotal,...
                 'P1optimizationVariables',{u, attu},...
                 'P2optimizationVariables',{D, d, attvback},...
                 'latentVariables',{x,att},...
                 'P1constraints',{...
-                                 u >= -1e-5*Tones(size(u)),...
+                                 u >= -1e-3*Tones(size(u)),...
                                  u <= uMax*Tones(size(u)),...
                                  attu <= attuMax*Tones(size(attu)),...
                                  attu >= -attuMax*Tones(size(attu))...
