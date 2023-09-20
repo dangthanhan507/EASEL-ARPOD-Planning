@@ -1,4 +1,4 @@
-function benchmark = main()
+function benchmark = main(algo_type)
     clc
     close all
     rng(1);
@@ -28,15 +28,20 @@ function benchmark = main()
     disturbance_fn = @(u) D*u + d;
     apply_fn = @(u) u(1:3,:) - u(4:6,:);
     
-    backwardHorizon = 15;
-    forwardHorizon  = 20;
+    forwardHorizon  = 10;
+    backwardHorizon = 8;
 
     xTraj = [x0;xdot0];
     attTraj = [att0;attdot0];
 
-    algo = mpcmhe;
-    algo = algo.init(backwardHorizon, forwardHorizon, xTraj, attTraj);
-    algo = algo.setupOptimizationCode(time_step);
+    if algo_type == 1
+        algo = mpcmhe;
+        algo = algo.init(backwardHorizon, forwardHorizon, xTraj, attTraj);
+        algo = algo.setupOptimizationCode(time_step);
+    else
+        algo = mpcekf;
+        algo = algo.init;
+    end
 
     disp("Starting Simulation")
     control    = zeros(6,1);
@@ -67,6 +72,8 @@ function benchmark = main()
             disp(utils.measure(state))
             disp("True Meas")
             disp(meas)
+            disp("Control")
+            disp(control)
         end
     end
     disp("Finished")
