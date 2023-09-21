@@ -212,7 +212,7 @@ classdef mpcmhe
             dynamicsConstraintsTranslational = tenscalc_utils.mpcmheDynamicsTranslational(A_HCW, B_HCW,...
                                                                              x0, x, att0, att, uback, u, D, d);
 
-            mpcQ = 1e10;
+            mpcQ = 1e6;
             mpcR = 1e1;
             mheQ = 1e6;
             mheR = 1e6;

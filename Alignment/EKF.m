@@ -24,11 +24,16 @@ classdef EKF
             These are properties of EKF tracked over time.
             The only ones that matter.
         %}
+        A
+        B
         state = [0;0;0;0;0;0];
         cov = eye(6);
+
+        Q % system Covariance
+        R % measure Covariance
     end
     methods 
-        function obj = initEKF(obj, state0, cov0)
+        function obj = init(obj, state0, cov0, A, B, systemCov, measCov)
             %{
                 Parameters:
                 ------------
@@ -40,14 +45,18 @@ classdef EKF
             %}
             obj.state = state0;
             obj.cov = cov0;
+
+            obj.A = A;
+            obj.B = B;
+            obj.Q = systemCov;
+            obj.R = measCov;
         end
-        function obj = prediction(obj, u, systemCov, tstep)
+        function obj = prediction(obj, u)
             %{
                 Parameters:
                 ------------
                     u: 3x1 vector control input of thrusters (in accel)
                     systemCov: 6x6 matrix system covariance of EKF.
-                    tstep: discrete timestep of EKF.
                     
                 Description:
                 ------------
@@ -57,11 +66,10 @@ classdef EKF
                     Hill-Clohessy-Wiltshire equations for relative space
                     motion. This assumes discrete control input over time.
             %}
-            [A,B] = ARPOD_Dynamics.linearHCWDynamics(tstep);
-            obj.state = A*obj.state + B*u;
-            obj.cov = A*obj.cov*transpose(A) + systemCov;
+            obj.state = obj.A*obj.state + obj.B*u;
+            obj.cov = obj.A*obj.cov*transpose(obj.A) + obj.Q;
         end
-        function obj = sensor_correct(obj, z_t, measCov, phase)
+        function obj = sensor_correctEKF(obj, z_t)
             %{
                 Parameters:
                 -----------
@@ -78,27 +86,40 @@ classdef EKF
             %}
 
             %take jacobian of the measurements based on the state
-            H = ARPOD_Sensor.measureJacobian(obj.state);
+            H = utils.measureJacobian(obj.state);
             %calculate riccati K gain
-            if phase == 1
-                measCov = measCov(1:2,1:2);
-            end
-            K_gain = obj.cov*transpose(H)*inv(H*obj.cov*transpose(H)+measCov);
+            K_gain = obj.cov*transpose(H)*inv(H*obj.cov*transpose(H)+obj.R);
 
             %convert predicted state into a measurement to compare with the
             %real measurement, then correct covariance and state.
-            measure = ARPOD_Sensor.sense(obj.state, @() [0;0;0], phase);
+            measure = utils.measure(obj.state);
             obj.state = obj.state + K_gain*(z_t-measure);
             obj.cov = (eye(6) - K_gain*H)*obj.cov;
         end
-        function obj = estimate(obj, u, z_t, systemCov, measCov,tstep, phase)
+        function obj = sensor_correctKF(obj, z_t, C)
+            H = C;
+            measure = C*obj.state;
+            K_gain = obj.cov*transpose(H)*inv(H*obj.cov*transpose(H) + obj.R);
+
+            obj.state = obj.state + K_gain*(z_t-measure);
+            obj.cov = (eye(6) - K_gain*H)*obj.cov;
+        end
+        function obj = estimateEKF(obj, u, z_t)
             %{
                 Combines the use of both the predict and correct step
                 For the sake of generalizing state estimators.
                 NOTE: I hope ducktyping works :)
             %}
-            obj = obj.prediction(u,systemCov,tstep);
-            obj = obj.sensor_correct(z_t,measCov,phase);
+            obj = obj.prediction(u);
+            obj = obj.sensor_correctEKF(z_t);
+        end
+        function obj = estimateKF(obj, u, z_t, C)
+            obj = obj.prediction(u);
+            obj = obj.sensor_correctKF(z_t, C);
+        end
+
+        function state = outputResult(obj)
+            state = obj.state;
         end
     end
 end

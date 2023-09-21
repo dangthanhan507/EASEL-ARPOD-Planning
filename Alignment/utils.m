@@ -184,6 +184,39 @@ classdef utils
             e3 = norm;
             z_t = [e1;e2;e3];
         end
+        function jacobian = measureJacobian(state)
+            x = state(1,:);
+            y = state(2,:);
+            z = state(3,:);
+            
+            jacobian = zeros(3,6);
+            %dArctan
+            partialX = -y/(x*x+y*y);
+            partialY = x/(x*x+y*y);
+            jacobian(1,1) = partialX;
+            jacobian(1,2) = partialY;
+            %rest of the partials are zero so it doesn't matter anyways.
+
+            %dArcsin
+            norm = sqrt( (x*x+y*y)/(x*x+y*y+z*z) ) * (x*x+y*y+z*z).^(3/2);
+            partialX = -x*z/norm;
+            partialY = -y*z/norm;
+            partialZ = sqrt( (x*x+y*y)/(x*x+y*y+z*z) ) / sqrt(x*x+y*y+z*z);
+            jacobian(2,1) = partialX;
+            jacobian(2,2) = partialY;
+            jacobian(2,3) = partialZ;
+
+            %drho
+            norm = sqrt(x*x+y*y+z*z);
+            partialX = x/norm;
+            partialY = y/norm;
+            partialZ = z/norm;
+            jacobian(3,1) = partialX;
+            jacobian(3,2) = partialY;
+            jacobian(3,3) = partialZ;
+
+            %return jacobian
+        end
 
         function rot = rotRPY(theta)
             R11 = cos(theta(3,:)).*cos(theta(2,:));
