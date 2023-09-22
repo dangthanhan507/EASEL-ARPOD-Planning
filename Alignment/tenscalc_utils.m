@@ -81,19 +81,24 @@ classdef tenscalc_utils
             u = uk;
             dynamicConstraints = (Tx == A*xk + B*u);
         end
+        function sensorConstraints = mpcmheSensorConstraintsTranslational(Tx, sensorDisturb, measurements)
+            [meas_dim, backwardHorizon] = size(measurements);
+            % g_of_x = tenscalc_utils.SensingVectorized(Tx(:,1:backwardHorizon));
+            g_of_x = Tx(:,1:backwardHorizon);
+            sensorConstraints = (measurements == g_of_x + sensorDisturb);
+        end
 
         %{
             BIGGEST REVELATION:
             the nonlinear measurement function is causing big problems
         %}
 
-        function Jcost = mpcmheObjectiveTranslational(mpcQ, mpcR, mheQ, mheR, Tx, uForward, meas, disturbance, TD)
+        function Jcost = mpcmheObjectiveTranslational(mpcQ, mpcR, mheQ, mheR, Tx, uForward, meas, vback, disturbance, TD)
             [meas_dim, backwardHorizon] = size(meas);
             [control_dim, forwardHorizon] = size(uForward);
 
-            g_of_x = tenscalc_utils.SensingVectorized(Tx(:,1:backwardHorizon));
-
             Jcost = mpcQ*norm2( Tx(:,backwardHorizon+1:forwardHorizon) ) + mpcR*norm2(uForward);
+            Jcost = Jcost - mheR*norm2(vback);
             % Jcost = Jcost - mheQ*norm2(TD) - mheQ*norm2(disturbance) - mheR*norm2(meas - g_of_x);
             % Jcost = Jcost - mheR*norm2(meas - g_of_x);
             % Jcost = Jcost - mheQ*norm2(TD) - mheQ*norm2(disturbance) - mheR*norm2(meas(1:2,:) - g_of_x(1:2,:)) - mheR*1e2*norm2(meas(3,:) - g_of_x(3,:));

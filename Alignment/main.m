@@ -30,8 +30,8 @@ function benchmark = main(algo_type)
     % apply_fn = @(u) u(1:3,:) - u(4:6,:);
     apply_fn = @(u) u;
     
-    forwardHorizon  = 20;
-    backwardHorizon = 15;
+    forwardHorizon  = 10;
+    backwardHorizon = 5;
 
     xTraj = [x0;xdot0];
     attTraj = [att0;attdot0];
@@ -49,7 +49,10 @@ function benchmark = main(algo_type)
     % control    = zeros(6,1);
     control = zeros(3,1);
     controlAtt = zeros(3,1);
+    
 
+    ctr = 1;
+    window_mheXsWarmUp = zeros(6, backwardHorizon);
 
     for i = time_step:time_step:sim_time
 
@@ -59,9 +62,18 @@ function benchmark = main(algo_type)
         xTraj = utils.nonlinearMotionSolver(xTraj, apply_fn(disturbance_fn(control)), time_step);
         attTraj = utils.attitudeSolver(attTraj, controlAtt, time_step);
 
-        meas    = utils.measure(xTraj);
+        % meas    = utils.measure(xTraj);
+        meas = xTraj;
         measAtt = attTraj;
         %%%%% SIMULATION ONLY END %%%%%
+
+        if ctr <= backwardHorizon
+            window_mheXsWarmUp(:,ctr) = xTraj;
+            if ctr == backwardHorizon
+                algo.window_mheXs = window_mheXsWarmUp;
+            end
+        end
+        ctr = ctr + 1;
 
         algo = algo.estimate_and_control(control, controlAtt, meas, measAtt);
         [control, controlAtt, state, stateAtt] = algo.outputResults();
@@ -89,5 +101,5 @@ function benchmark = main(algo_type)
     disp(state)
 
 
-    benchmark = 1;
+    benchmark = algo;
 end

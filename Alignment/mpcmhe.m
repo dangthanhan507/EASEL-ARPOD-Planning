@@ -13,6 +13,7 @@ classdef mpcmhe
         window_mheUs % mhe control past
         window_mpcUs % mpc control future
         window_mheYs % mhe measurement past
+        window_mheVs
 
         Dmat         % Time-Invariant disturbance
         window_ds % Time-varying additive disturbance
@@ -31,6 +32,9 @@ classdef mpcmhe
         forwardT
         x0
         att0
+
+        A
+        B
     end
     methods
         function obj = init(obj, backwardHorizon, forwardHorizon, x0, att0)
@@ -43,7 +47,8 @@ classdef mpcmhe
             obj.window_mpcXs = zeros(6, forwardHorizon); % mpc states
             obj.window_mheUs = zeros(3, backwardHorizon); % mhe control past
             obj.window_mpcUs = zeros(3, forwardHorizon); % mpc control future
-            obj.window_mheYs = zeros(3, backwardHorizon); % mhe measurement past
+            obj.window_mheYs = zeros(6, backwardHorizon); % mhe measurement past
+            obj.window_mheVs = zeros(6, backwardHorizon); % mhe sensor noise past 
 
             % obj.Dmat = eye(6);         % Time-Invariant disturbance
             obj.Dmat = ones(3);
@@ -91,7 +96,7 @@ classdef mpcmhe
                 obj.x0 = obj.window_mheXs(:,1);
                 obj.window_mheXs = [obj.window_mheXs(:,2:end), obj.window_mpcXs(:,1)];
 
-                obj.window_mpcXs = [obj.window_mpcXs(:,2:end), obj.window_mpcXs(:,end)];
+                obj.window_mpcXs = [obj.window_mpcXs(:,2:end), obj.A*obj.window_mpcXs(:,end)];
 
                 [dim,n] = size(obj.window_ds);
                 obj.window_ds = [obj.window_ds(:,2:end), zeros(dim,1)];
@@ -126,6 +131,7 @@ classdef mpcmhe
                 % setV_D(obj.opt, obj.Dmat);
                 % setV_d(obj.opt, obj.window_ds);
                 setV_x(obj.opt, [obj.window_mheXs, obj.window_mpcXs]);
+                setV_vback(obj.opt, obj.window_mheVs);
 
                 % attitudinal variable setting
                 setP_attuback(obj.opt, obj.window_mheUsAtt);
@@ -180,7 +186,7 @@ classdef mpcmhe
 
             statedim = 6;
             controldim = 3;
-            meas_dim = 3;
+            meas_dim = 6;
 
             %translation tcalc variables
             Tvariable x0    [statedim,1];
@@ -190,6 +196,7 @@ classdef mpcmhe
             Tvariable u     [controldim, forwardHorizon];
             Tvariable D [controldim, controldim];
             Tvariable d [controldim, backHorizon + forwardHorizon];
+            Tvariable vback [meas_dim, backHorizon];
 
             statedim = 6;
             controldim = 3;
@@ -206,20 +213,23 @@ classdef mpcmhe
             [A_HCW, B_HCW] = utils.linearHCWDynamics(tstep);
             [Aatt,  Batt]  = utils.attitudeDiscrete(tstep);
 
+            obj.A = A_HCW;
+            obj.B = B_HCW;
+
 
             % translational setup
             dynamicsConstraintsTranslational = tenscalc_utils.mpcmheDynamicsTranslational(A_HCW, B_HCW,...
                                                                              x0, x, att0, att, uback, u, D, d);
-
-            mpcQ = 1e4;
-            mpcR = 1e-3;
-            mheQ = 1e2;
+            sensorConstraintsTranslational = tenscalc_utils.mpcmheSensorConstraintsTranslational(x,vback,ypast);
+            mpcQ = 1e1;
+            mpcR = 1e1;
+            mheQ = 1e5;
             mheR = 1e5;
-            Jcost = tenscalc_utils.mpcmheObjectiveTranslational(mpcQ,mpcR,mheQ,mheR,x,u,ypast,d,D);
+            Jcost = tenscalc_utils.mpcmheObjectiveTranslational(mpcQ,mpcR,mheQ,mheR,x,u,ypast,vback, d,D);
 
 
             % attitudinal setup
-            mpcQ = 1e4;
+            mpcQ = 1e1;
             mpcR = 1e1;
             mheQ = 1e1;
             mheR = 1e1;
@@ -231,8 +241,9 @@ classdef mpcmhe
 
             uMax = 0.1;
             attuMax = 0.3;
-            DMax = 1.4;
+            DMax = 1.0;
             dMax = 0.1;
+            vMax = 0.1;
             attvMax = 0.8;
 
             classname = obj.optimizer(...
@@ -240,7 +251,7 @@ classdef mpcmhe
                 'P1objective',Jtotal,...
                 'P2objective',-Jtotal,...
                 'P1optimizationVariables',{u, attu},...
-                'P2optimizationVariables',{attvback},...
+                'P2optimizationVariables',{attvback,vback},...
                 'latentVariables',{x,att},...
                 'P1constraints',{...
                                  u >= -uMax*Tones(size(u)),...
@@ -249,6 +260,7 @@ classdef mpcmhe
                                  attu >= -attuMax*Tones(size(attu))...
                                  },...
                 'P2constraints',{...
+                                 sensorConstraintsTranslational,...
                                  sensorConstraintsAttitude,...
                                  attvback >= -attvMax*Tones(size(attvback)),...
                                  attvback <= attvMax*Tones(size(attvback))...
