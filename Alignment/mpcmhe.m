@@ -1,9 +1,9 @@
 classdef mpcmhe
     properties
         maxIter = 40;
-        compileFlag = '-Ofast';
-        % optimizer = @cmex2equilibriumLatentCS;
-        optimizer = @class2equilibriumLatentCS;
+        compileFlag = '-O0';
+        optimizer = @cmex2equilibriumLatentCS;
+        % optimizer = @class2equilibriumLatentCS;
         opt
 
 
@@ -41,12 +41,13 @@ classdef mpcmhe
             %windows (translational)
             obj.window_mheXs = zeros(6, backwardHorizon); % mhe states
             obj.window_mpcXs = zeros(6, forwardHorizon); % mpc states
-            obj.window_mheUs = zeros(6, backwardHorizon); % mhe control past
-            obj.window_mpcUs = zeros(6, forwardHorizon); % mpc control future
+            obj.window_mheUs = zeros(3, backwardHorizon); % mhe control past
+            obj.window_mpcUs = zeros(3, forwardHorizon); % mpc control future
             obj.window_mheYs = zeros(3, backwardHorizon); % mhe measurement past
 
-            obj.Dmat = eye(6);         % Time-Invariant disturbance
-            obj.window_ds = zeros(6, backwardHorizon + forwardHorizon); % Time-varying additive disturbance
+            % obj.Dmat = eye(6);         % Time-Invariant disturbance
+            obj.Dmat = ones(3);
+            obj.window_ds = zeros(3, backwardHorizon + forwardHorizon); % Time-varying additive disturbance
 
             %windows (attitudinal)
             obj.window_mheXsAtt = zeros(6, backwardHorizon); % mhe states
@@ -81,8 +82,6 @@ classdef mpcmhe
                 obj.window_mheYsAtt(:,obj.time_ctr) = measAtt;
                 obj.window_mheUsAtt(:,obj.time_ctr) = controlAtt;
 
-                obj.window_mpcUs = zeros(6, obj.forwardT);
-                obj.window_mpcUsAtt = zeros(3, obj.forwardT);
 
                 obj.time_ctr = obj.time_ctr + 1;
             else
@@ -124,8 +123,8 @@ classdef mpcmhe
                 setP_ypast(obj.opt, obj.window_mheYs);
                 setP_x0(obj.opt, obj.x0);
                 setV_u(obj.opt, obj.window_mpcUs);
-                setV_D(obj.opt, obj.Dmat);
-                setV_d(obj.opt, obj.window_ds);
+                % setV_D(obj.opt, obj.Dmat);
+                % setV_d(obj.opt, obj.window_ds);
                 setV_x(obj.opt, [obj.window_mheXs, obj.window_mpcXs]);
 
                 % attitudinal variable setting
@@ -146,7 +145,7 @@ classdef mpcmhe
                 disp("Iterations:")
                 disp(iter)
 
-                [Jtotal, Xs, XsAtt, mpcUs, mpcUsAtt, D, d, mheVsAtt] = getOutputs(obj.opt);
+                [Jtotal, Xs, XsAtt, mpcUs, mpcUsAtt, mheVsAtt] = getOutputs(obj.opt);
 
                 disp("Jcost:")
                 disp(Jtotal)                
@@ -157,8 +156,8 @@ classdef mpcmhe
                 obj.window_mpcXs = mpcXs;
                 obj.window_mheXs = mheXs;
                 obj.window_mpcUs = mpcUs;
-                obj.Dmat = D;
-                obj.window_ds = d;
+                % obj.Dmat = D;
+                % obj.window_ds = d;
 
                 mheXsAtt = XsAtt(:,1:obj.backwardT);
                 mpcXsAtt = XsAtt(:,obj.backwardT+1:end);
@@ -180,7 +179,7 @@ classdef mpcmhe
             forwardHorizon = obj.forwardT;
 
             statedim = 6;
-            controldim = 6;
+            controldim = 3;
             meas_dim = 3;
 
             %translation tcalc variables
@@ -212,15 +211,15 @@ classdef mpcmhe
             dynamicsConstraintsTranslational = tenscalc_utils.mpcmheDynamicsTranslational(A_HCW, B_HCW,...
                                                                              x0, x, att0, att, uback, u, D, d);
 
-            mpcQ = 1e6;
-            mpcR = 1e1;
-            mheQ = 1e6;
-            mheR = 1e6;
+            mpcQ = 1e4;
+            mpcR = 1e-3;
+            mheQ = 1e2;
+            mheR = 1e5;
             Jcost = tenscalc_utils.mpcmheObjectiveTranslational(mpcQ,mpcR,mheQ,mheR,x,u,ypast,d,D);
 
 
             % attitudinal setup
-            mpcQ = 1e1;
+            mpcQ = 1e4;
             mpcR = 1e1;
             mheQ = 1e1;
             mheR = 1e1;
@@ -241,25 +240,21 @@ classdef mpcmhe
                 'P1objective',Jtotal,...
                 'P2objective',-Jtotal,...
                 'P1optimizationVariables',{u, attu},...
-                'P2optimizationVariables',{D, d, attvback},...
+                'P2optimizationVariables',{attvback},...
                 'latentVariables',{x,att},...
                 'P1constraints',{...
-                                 u >= -1e-3*Tones(size(u)),...
+                                 u >= -uMax*Tones(size(u)),...
                                  u <= uMax*Tones(size(u)),...
                                  attu <= attuMax*Tones(size(attu)),...
                                  attu >= -attuMax*Tones(size(attu))...
                                  },...
                 'P2constraints',{...
                                  sensorConstraintsAttitude,...
-                                 D <= DMax*Tones(size(D)),...
-                                 D >= -DMax*Tones(size(D)),...
-                                 d >= -dMax*Tones(size(d)),...
-                                 d <= dMax*Tones(size(d)),...
                                  attvback >= -attvMax*Tones(size(attvback)),...
                                  attvback <= attvMax*Tones(size(attvback))...
                                  },...
                 'latentConstraints',{dynamicsConstraintsTranslational, dynamicsConstraintsAttitude},...
-                'outputExpressions',{Jtotal, x, att, u, attu, D, d, attvback},...
+                'outputExpressions',{Jtotal, x, att, u, attu, attvback},...
                 'parameters',{uback, attuback, ypast, attypast, x0, att0},...
                 'smallerNewtonMatrix',false,...
                 'addEye2Hessian',true,...

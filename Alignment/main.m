@@ -11,25 +11,27 @@ function benchmark = main(algo_type)
     sim_time  = 40;
 
 
-    x0   = [1;1;1];
+    x0   = [10;10;10];
     att0 = [1;1;1];
     xdot0 = [0;0;0];
     attdot0 = [0;0;0];
 
-    noiseQ    = [0;0;0;0;0;0];
-    noiseQAtt = [0;0;0;0;0;0];
+    process_noise = [0,0,0,0,0,0];
+    noiseQ        = @() mvnrnd([0;0;0;0;0;0], [0,0,0,0,0,0] + process_noise).';
 
-    noiseR    = [0;0;0];
-    noiseRAtt = [0;0;0;0;0;0];
+    sensor_noise = [1e-3,1e-3,1e-5];
+    noiseR        = @() mvnrnd([0;0;0], [0,0,0] + sensor_noise);
 
 
     d = [0;0;0;0;0;0];
     D = eye(6);
-    disturbance_fn = @(u) D*u + d;
-    apply_fn = @(u) u(1:3,:) - u(4:6,:);
+    % disturbance_fn = @(u) D*u + d;
+    disturbance_fn = @(u) u;
+    % apply_fn = @(u) u(1:3,:) - u(4:6,:);
+    apply_fn = @(u) u;
     
-    forwardHorizon  = 10;
-    backwardHorizon = 8;
+    forwardHorizon  = 20;
+    backwardHorizon = 15;
 
     xTraj = [x0;xdot0];
     attTraj = [att0;attdot0];
@@ -44,7 +46,8 @@ function benchmark = main(algo_type)
     end
 
     disp("Starting Simulation")
-    control    = zeros(6,1);
+    % control    = zeros(6,1);
+    control = zeros(3,1);
     controlAtt = zeros(3,1);
 
 
@@ -52,8 +55,8 @@ function benchmark = main(algo_type)
 
         %%% DO NOT TOUCH SIMULATION CODE %%%
         %%%%% SIMULATION ONLY %%%%%
-        xTraj = utils.nonlinearMotionSolver(xTraj, utils.rotRPY(attTraj)*apply_fn(disturbance_fn(control)), time_step);
-        % xTraj = utils.nonlinearMotionSolver(xTraj, apply_fn(disturbance_fn(control)), time_step);
+        % xTraj = utils.nonlinearMotionSolver(xTraj, utils.rotRPY(attTraj)*apply_fn(disturbance_fn(control)), time_step);
+        xTraj = utils.nonlinearMotionSolver(xTraj, apply_fn(disturbance_fn(control)), time_step);
         attTraj = utils.attitudeSolver(attTraj, controlAtt, time_step);
 
         meas    = utils.measure(xTraj);
