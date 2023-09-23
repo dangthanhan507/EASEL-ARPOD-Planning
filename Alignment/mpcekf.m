@@ -27,7 +27,7 @@ classdef mpcekf
             obj.window_mpcXs = zeros(6,obj.forwardT);
 
             obj.window_mpcUsAtt = zeros(3,obj.forwardT);
-            obj.window_mpcUs    = zeros(6,obj.forwardT);
+            obj.window_mpcXsAtt = zeros(6,obj.forwardT);
 
             obj.x0 = x0;
             obj.att0 = att0;
@@ -36,14 +36,16 @@ classdef mpcekf
         % for general use
         function [control, attcontrol, state, stateAtt] = outputResults(obj)
             control = obj.window_mpcUs(:,1);
-            attcontrol = obj.window_mpcUs(:,1);
+            attcontrol = obj.window_mpcUsAtt(:,1);
 
             state = obj.x0;
             stateAtt = obj.att0;
         end
         function obj = estimate_and_control(obj, control, controlAtt, meas, measAtt)
-            obj.ekf_hcw.estimateEKF(control, meas);
-            obj.ekf_att.estimateKF(controlAtt, measAtt, eye(6));
+
+            P = [eye(3), -eye(3)];
+            obj.ekf_hcw = obj.ekf_hcw.estimateEKF(P*control, meas);
+            obj.ekf_att = obj.ekf_att.estimateKF(controlAtt, measAtt, eye(6));
 
             hcw_state = obj.ekf_hcw.outputResult();
             att_state = obj.ekf_att.outputResult();
@@ -67,11 +69,11 @@ classdef mpcekf
             
             setP_att0(obj.opt, obj.att0);
             setV_att(obj.opt, obj.window_mpcXsAtt);
-            setV_u(obj.opt, obj.window_mpcUsAtt);
+            setV_attu(obj.opt, obj.window_mpcUsAtt);
 
             mu0 = 1;
             saveIter = -1;
-            addEyeHessian = [1e-5, 1e-5];
+            addEyeHessian = [1e-5; 1e-5];
             [status, iter, time] = solve(obj.opt, mu0, int32(obj.maxIter), int32(saveIter), addEyeHessian);
 
             disp("Status:")
@@ -136,7 +138,7 @@ classdef mpcekf
 
             classname = obj.optimizer(...
                 'classname', 'tmpC',...
-                'optimizationVariables', {x,u,att,u},...
+                'optimizationVariables', {x,u,att,attu},...
                 'objective',Jtotal,...
                 'constraints',{...
                                dynamicsConstraintsTranslational,...
@@ -148,10 +150,10 @@ classdef mpcekf
                                },...
                 'parameters',{x0, att0},...
                 'outputExpressions',{Jtotal, x, att, u, attu},...
-                'smallerNewtonMatrix',true,...
+                'smallerNewtonMatrix',false,...
                 'addEye2Hessian',true,...
                 'muFactorAggressive',0.99,...
-                'muFactorConvservative',0.99,...
+                'muFactorConservative',0.99,...
                 'desiredDualityGap',0.1,...
                 'maxIter',obj.maxIter,...
                 'gradTolerance',1e-3,...

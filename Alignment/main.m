@@ -38,9 +38,22 @@ function benchmark = main(algo_type)
         algo = mpcmhe;
         algo = algo.init(backwardHorizon, forwardHorizon, xTraj, attTraj);
         algo = algo.setupOptimizationCode(time_step);
-    else
+    elseif algo_type == 2
         algo = mpcekf;
-        algo = algo.init;
+        algo = algo.init(forwardHorizon, xTraj, attTraj);
+
+        cov0att = 1e-10*eye(6);
+
+        cov0 = 1e-10*eye(6);
+        Q    = 1e-3*eye(6);
+        R    = 1e-10*eye(3);
+
+        Qatt = 1e-5*eye(6);
+        Ratt = 1e-3*eye(6);
+        algo = algo.setupEKF(cov0,cov0att,Q,R,Qatt,Ratt,time_step);
+        algo = algo.setupOptimizationCode(time_step);
+    else
+        error("NOT IMPLEMENTED")
     end
 
     disp("Starting Simulation")
@@ -63,7 +76,7 @@ function benchmark = main(algo_type)
         algo = algo.estimate_and_control(control, controlAtt, meas, measAtt);
         [control, controlAtt, state, stateAtt] = algo.outputResults();
 
-        if i >= backwardHorizon
+        if i >= backwardHorizon || algo_type == 2
             disp("State Estimated")
             disp(state)
             disp("True State")

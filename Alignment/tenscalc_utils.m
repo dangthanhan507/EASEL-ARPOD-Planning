@@ -52,7 +52,7 @@ classdef tenscalc_utils
             dynamicConstraints = (Tx == A*xk + B*u);
         end
         function Jcost = mpcObjectiveTranslational(mpcQ, mpcR, Tx, uforward)
-            Jcost = mpcQ*norm2(Tx) + mpcR*uforward;
+            Jcost = mpcQ*norm2(Tx) + mpcR*norm2(uforward);
         end
 
         %%%%%%%% ATTITUDINAL MPC SETUP %%%%%%%%
@@ -62,7 +62,7 @@ classdef tenscalc_utils
             dynamicConstraints = (Tatt == A*attk + B*uAtt);
         end
         function Jcost = mpcObjectiveAttitude(mpcQ, mpcR, Tatt, uAtt)
-            Jcost = mpcQ*norm2(Tatt) + mpcR*uAtt;
+            Jcost = mpcQ*norm2(Tatt) + mpcR*norm2(uAtt);
         end
 
 
