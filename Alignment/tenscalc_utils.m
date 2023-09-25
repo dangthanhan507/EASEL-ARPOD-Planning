@@ -43,6 +43,27 @@ classdef tenscalc_utils
             z_t(3,:) = rho;
         end
 
+        function dynamicConstraints = mheDynamicsTranslational(A, B, Tx0, Tx, Tatt0, Tatt, uk, d)
+            xk = [Tx0,Tx(:,1:end-1)];
+            attk = [Tatt0, Tatt(:,1:end-1)];
+
+            u = uk + d;
+            u = tenscalc_utils.FullRotation(attk(1:3,:), u(1:3,:) - u(4:6,:));
+            dynamicConstraints = (Tx == A*xk + B*u);
+        end
+        function Jcost = mheObjectiveTranslational(mheQ, mheR, Tx, meas, disturbance)
+            g_of_x = tenscalc_utils.SensingVectorized(Tx(:,1:backwardHorizon));
+            Jcost = mheQ*norm2(disturbance) + mheR*norm2(meas - g_of_x);
+        end
+
+        function dynamicConstraints = mheDynamicsAttitude(A, B, Tatt0, Tatt, uatt)
+            attk = [Tatt0, Tatt(:,1:end-1)];
+            dynamicConstraints = (Tatt == A*attk + B*uatt);
+        end
+        function Jcost = mheObjectiveAttitude(mheQ, mheR, Tatt, meas)
+            Jcost = mheR*norm2(meas - Tatt);
+        end
+
         %%%%%%%% TRANSLATION MPC SETUP %%%%%%%%
         function dynamicConstraints = mpcDynamicsTranslational(A, B, Tx0, Tx, Tatt0, Tatt, uforward)
             xk = [Tx0, Tx(:,1:end-1)];  

@@ -2,8 +2,8 @@ classdef mpcmhe
     properties
         maxIter = 40;
         compileFlag = '-Ofast';
-        % optimizer = @cmex2equilibriumLatentCS;
-        optimizer = @class2equilibriumLatentCS;
+        optimizer = @cmex2equilibriumLatentCS;
+        % optimizer = @class2equilibriumLatentCS;
         opt
 
 
